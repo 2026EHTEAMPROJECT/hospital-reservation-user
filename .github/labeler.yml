@@ -1,0 +1,46 @@
+area/config:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/main/resources/**'
+      - 'build.gradle.kts'
+      - 'gradle.properties'
+      - 'docker-compose.yml'
+      - 'Dockerfile'
+      - '.github/**'
+
+area/security:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/main/java/**/security/**'
+      - 'src/main/java/**/config/Security*.java'
+      - 'src/main/java/**/auth/**'
+      - 'src/main/java/**/jwt/**'
+
+area/api:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/main/java/**/controller/**'
+      - 'src/main/java/**/dto/**'
+
+area/domain:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/main/java/**/domain/**'
+      - 'src/main/java/**/entity/**'
+      - 'src/main/java/**/repository/**'
+
+area/service:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/main/java/**/service/**'
+
+area/infra:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/main/java/**/config/**'
+      - 'docker/**'
+
+area/test:
+  - changed-files:
+    - any-glob-to-any-file:
+      - 'src/test/**'
