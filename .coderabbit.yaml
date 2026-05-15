@@ -1,0 +1,10 @@
+language: ko
+
+reviews:
+  auto_review:
+    enabled: true
+    drafts: false
+  poem: false
+
+chat:
+  auto_reply: true
