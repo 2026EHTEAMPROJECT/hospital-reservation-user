@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedicalCare+ | 병원 예약 시스템</title>
+    <!-- CSS 연결 -->
+    <link rel="stylesheet" href="/css/style.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="container nav-container">
+                <div class="logo">MedicalCare<span class="plus">+</span></div>
+                <div class="nav-links">
+                    <a href="#" id="nav-home" class="hidden">홈 (예약하기)</a>
+                    <a href="#" id="nav-mypage" class="hidden">마이페이지</a>
+                    <a href="#" id="nav-logout" class="hidden btn-outline">로그아웃</a>
+                </div>
+            </div>
+        </nav>
+
+        <main class="main-content">
+            <!-- Loader -->
+            <div id="loader" class="loader-overlay hidden">
+                <div class="spinner"></div>
+            </div>
+
+            <!-- Toast Notification -->
+            <div id="toast" class="toast hidden"></div>
+
+            <!-- Auth Section (Login & Signup) -->
+            <section id="auth-section" class="section-container">
+                <div class="auth-box">
+                    <h2 id="auth-title">로그인</h2>
+                    <p class="auth-subtitle">예약을 위해 로그인해주세요.</p>
+                    <form id="auth-form">
+                        <div class="input-group">
+                            <label for="username">이메일</label>
+                            <input type="email" id="username" placeholder="이메일을 입력하세요" required>
+                        </div>
+                        <div class="input-group">
+                            <label for="password">비밀번호</label>
+                            <input type="password" id="password" placeholder="비밀번호를 입력하세요" required>
+                        </div>
+                        
+                        <!-- Signup specific fields -->
+                        <div id="signup-fields" class="hidden">
+                            <div class="input-group">
+                                <label for="name">이름</label>
+                                <input type="text" id="name" placeholder="실명을 입력하세요">
+                            </div>
+                            <div class="input-group">
+                                <label for="phone">전화번호</label>
+                                <input type="tel" id="phone" placeholder="010-0000-0000">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100" id="auth-submit-btn">로그인</button>
+                        
+                        <div class="auth-switch">
+                            <span id="auth-switch-text">계정이 없으신가요?</span>
+                            <a href="#" id="toggle-auth-btn">회원가입하기</a>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Dashboard Section (Doctors & Booking) -->
+            <section id="dashboard-section" class="section-container hidden">
+                <div class="dashboard-header">
+                    <h2>환영합니다, <span id="user-greeting">고객</span>님!</h2>
+                    <p>원하시는 진료과목과 의료진을 선택해 예약해 보세요.</p>
+                </div>
+                
+                <div class="dashboard-grid">
+                    <!-- Doctors List -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>👨‍⚕️ 의료진 목록</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="doctors-list" class="list-container">
+                                <!-- JS renders doctor items here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Booking Form -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>📅 진료 예약</h3>
+                        </div>
+                        <div class="card-body">
+                            <form id="booking-form">
+                                <input type="hidden" id="selected-doctor-id">
+                                
+                                <div class="selected-doctor-display" id="selected-doctor-display">
+                                    <p class="placeholder-text">먼저 왼쪽 목록에서 의료진을 선택해주세요.</p>
+                                </div>
+
+                                <div id="booking-inputs" class="disabled-area">
+                                    <div class="input-group">
+                                        <label for="booking-date">예약 날짜</label>
+                                        <input type="date" id="booking-date" required disabled>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="booking-time">예약 시간</label>
+                                        <select id="booking-time" required disabled>
+                                            <option value="">시간 선택</option>
+                                            <option value="09:00">09:00</option>
+                                            <option value="10:00">10:00</option>
+                                            <option value="11:00">11:00</option>
+                                            <option value="14:00">14:00</option>
+                                            <option value="15:00">15:00</option>
+                                            <option value="16:00">16:00</option>
+                                        </select>
+                                    </div>
+                                    <div class="input-group">
+                                        <label for="symptoms">증상 메모 (선택)</label>
+                                        <textarea id="symptoms" rows="3" placeholder="간략한 증상을 적어주시면 진료에 도움이 됩니다." disabled></textarea>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary w-100 mt-3" id="btn-book" disabled>예약 신청하기</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- MyPage Section -->
+            <section id="mypage-section" class="section-container hidden">
+                <div class="dashboard-header">
+                    <h2>마이페이지</h2>
+                    <p>나의 프로필 정보와 예약 상태를 확인하고 관리할 수 있습니다.</p>
+                </div>
+
+                <div class="dashboard-grid">
+                    <!-- Profile Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>👤 내 프로필</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="profile-info">
+                                <div class="info-row">
+                                    <span class="info-label">이름</span>
+                                    <span class="info-value" id="profile-name">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">이메일</span>
+                                    <span class="info-value" id="profile-username">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">전화번호</span>
+                                    <span class="info-value" id="profile-phone">-</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bookings List Card -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>📑 예약 내역</h3>
+                        </div>
+                        <div class="card-body">
+                            <div id="bookings-list" class="list-container">
+                                <!-- JS renders bookings here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <!-- JS 연결 -->
+    <script src="/js/app.js"></script>
+</body>
+</html>
