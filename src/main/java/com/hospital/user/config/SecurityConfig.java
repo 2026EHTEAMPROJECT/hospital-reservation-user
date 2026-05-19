@@ -19,14 +19,16 @@ public class SecurityConfig {
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                             "/",
-                            "/css/**",
-                            "/js/**",
-                            "/images/**",
-                            "/swagger-ui/**",
-                            "/v3/api-docs/**",
-                            "/api/users/signup",
-                            "/api/users/login"
+                                "/",
+                                "/css/**",
+                                "/js/**",
+                                "/images/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/api/users/signup",
+                                "/api/users/login",
+                                "/api/users/{id}",
+                                "/api/doctors/{id}"
                         ).permitAll()
 
                         .anyRequest().authenticated()
