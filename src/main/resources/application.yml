@@ -4,18 +4,27 @@ server:
 spring:
   application:
     name: user-service
+
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/hospital_user?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
     username: ${MYSQL_USER:root}
     password: ${MYSQL_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
+
   jpa:
     hibernate:
       ddl-auto: update
+
     show-sql: true
+
     properties:
       hibernate:
+        format_sql: true
         dialect: org.hibernate.dialect.MySQLDialect
+
+  sql:
+    init:
+      mode: always
 
 jwt:
   secret: ${JWT_SECRET:hospitalSecretKey123456789012345678}
