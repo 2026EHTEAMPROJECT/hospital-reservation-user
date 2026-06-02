@@ -6,7 +6,7 @@
 // ===============================
 // ⚙️ 설정
 // ===============================
-const USE_MOCK = true;
+const USE_MOCK = false;
 const API_BASE_URL = 'http://localhost:8081/api';
 
 // ===============================
@@ -17,7 +17,8 @@ const state = {
     token: null,
     doctors: [],
     reservations: [],
-    selectedDoctor: null
+    selectedDoctor: null,
+    notificationSource: null
 };
 
 // ===============================
@@ -284,6 +285,8 @@ function checkLoginStatus() {
         state.token = savedToken;
         state.user = JSON.parse(savedUser);
 
+        connectNotification();
+
         navigate('dashboard');
 
     } else {
@@ -456,13 +459,16 @@ async function handleAuthSubmit(e) {
                     );
                 }
 
-                const token = await res.text();
+                const data = await res.json();
 
-                const user = {
-                    email
-                };
+                    saveAuth(data.token, {
+                    id: data.id,
+                    email: data.email,
+                    name: data.name,
+                    role: data.role
+                });
 
-                saveAuth(token, user);
+                connectNotification();
 
                 showToast('로그인 성공');
 
@@ -539,9 +545,67 @@ function saveAuth(token, user) {
 }
 
 // ===============================
+// 🔔 NOTIFICATION SSE
+// ===============================
+function connectNotification() {
+
+    if (!state.user?.id) return;
+
+    if (state.notificationSource) {
+
+        state.notificationSource.close();
+    }
+
+    state.notificationSource =
+    new EventSource(
+        `http://localhost:8084/notifications/stream?patientId=${state.user.id}`
+    );
+
+state.notificationSource.addEventListener(
+    'connect',
+    (event) => {
+        console.log('SSE 연결 성공', event.data);
+    }
+);
+
+state.notificationSource.addEventListener(
+    'notification',
+    (event) => {
+
+        const notification =
+            JSON.parse(event.data);
+
+        console.log(
+            '알림 수신',
+            notification
+        );
+
+        showToast(
+            notification.message
+        );
+    }
+);
+
+    state.notificationSource.onerror =
+        (error) => {
+
+            console.error(
+                'SSE 연결 실패',
+                error
+            );
+        };
+}
+
+// ===============================
 // 🚪 LOGOUT
 // ===============================
 function logout() {
+
+    if (state.notificationSource) {
+
+        state.notificationSource.close();
+        state.notificationSource = null;
+    }
 
     state.token = null;
     state.user = null;
@@ -630,7 +694,7 @@ function renderDoctors() {
                 </h4>
 
                 <p class="doctor-desc">
-                    ${doctor.hospital_name}
+                    ${doctor.hospitalName}
                     ${doctor.available ? '' : '(예약불가)'}
                 </p>
             </div>
@@ -670,7 +734,7 @@ function selectDoctor(doctor, element) {
         </h4>
 
         <p style="font-size:0.9rem;">
-            ${doctor.hospital_name}
+            ${doctor.hospitalName}
         </p>
     `;
 
@@ -857,12 +921,6 @@ function renderProfile() {
 
     DOM.profileEmail.textContent =
         state.user.email || '-';
-
-    if (DOM.profilePhone) {
-
-        DOM.profilePhone.textContent =
-            state.user.phone || '-';
-    }
 }
 
 // ===============================
@@ -887,23 +945,31 @@ async function loadMyBookings() {
         } else {
 
             const res =
-                await apiFetch(
-                    `/reservations/patient/${state.user.id}`
-                );
+    await apiFetch(
+        state.user?.role === 'ADMIN'
+            ? '/reservations'
+            : `/reservations/patient/${state.user.id}`
+    );
 
-            state.reservations =
-                await res.json();
+console.log('status=', res.status);
 
-            renderBookings();
+const data = await res.json();
+
+console.log('data=', data);
+
+state.reservations = data;
+
+renderBookings();
         }
 
     } catch (error) {
 
-        showToast(
-            '예약 내역을 불러오지 못했습니다.'
-        );
+    console.error(error);
 
-    } finally {
+    showToast(
+        '예약 내역을 불러오지 못했습니다.'
+    );
+} finally {
 
         hideLoader();
     }
@@ -929,6 +995,17 @@ function renderBookings() {
     }
 
     state.reservations.forEach(reservation => {
+
+        const doctor =
+            state.doctors.find(
+                d => d.id === reservation.doctorId
+        );
+
+        const doctorName =
+            doctor?.name || '의사정보없음';
+
+        const department =
+            doctor?.department || '진료과정보없음';
 
         let statusText = '';
 
@@ -961,9 +1038,9 @@ function renderBookings() {
             <div class="booking-header">
 
                 <strong>
-                    ${reservation.department}
+                    ${department}
                     -
-                    ${reservation.doctor_name}
+                    ${doctorName}
                     전문의
                 </strong>
 
@@ -975,8 +1052,8 @@ function renderBookings() {
             <div class="booking-details">
 
                 <p>
-                    📅 ${reservation.date}
-                    ⏰ ${reservation.time}
+                    📅 예약번호:${reservation.id}
+                    ⏰ 스케줄:${reservation.scheduleId}
                 </p>
 
                 <p style="
@@ -984,10 +1061,27 @@ function renderBookings() {
                     color:var(--text-muted);
                 ">
                     신청일:
-                    ${new Date(
-                        reservation.created_at
-                    ).toLocaleString()}
+                    ${reservation.createdAt
+                        ? new Date(reservation.createdAt).toLocaleString()
+                        : '-'}
                 </p>
+                ${
+        state.user?.role === 'ADMIN'
+            ? `
+                <div style="margin-top:10px;">
+                    <button
+                        onclick="confirmReservation(${reservation.id})">
+                        승인
+                    </button>
+
+                    <button
+                        onclick="cancelReservation(${reservation.id})">
+                        취소
+                    </button>
+                </div>
+                `
+                : ''
+            }
             </div>
         `;
 
@@ -1043,8 +1137,19 @@ async function apiFetch(url, options = {}) {
             `Bearer ${state.token}`;
     }
 
+    let baseUrl = API_BASE_URL;
+
+    // 예약 관련 API는 booking-service(8082)
+    if (
+        url.startsWith('/reservations')
+    ) {
+
+        baseUrl =
+            'http://localhost:8082/api';
+    }
+
     return fetch(
-        `${API_BASE_URL}${url}`,
+        `${baseUrl}${url}`,
         {
             ...options,
             headers
@@ -1052,6 +1157,65 @@ async function apiFetch(url, options = {}) {
     );
 }
 
+async function confirmReservation(id) {
+
+    try {
+
+        const res = await apiFetch(
+            `/reservations/${id}/confirm`,
+            {
+                method: 'PUT'
+            }
+        );
+
+        if (!res.ok) {
+
+            throw new Error(
+                '예약 승인 실패'
+            );
+        }
+
+        showToast('예약 승인 완료');
+
+        loadMyBookings();
+
+    } catch (error) {
+
+        showToast(
+            error.message
+        );
+    }
+}
+
+async function cancelReservation(id) {
+
+    try {
+
+        const res = await apiFetch(
+            `/reservations/${id}/cancel`,
+            {
+                method: 'PUT'
+            }
+        );
+
+        if (!res.ok) {
+
+            throw new Error(
+                '예약 취소 실패'
+            );
+        }
+
+        showToast('예약 취소 완료');
+
+        loadMyBookings();
+
+    } catch (error) {
+
+        showToast(
+            error.message
+        );
+    }
+}
 // ===============================
 // 🚀 START
 // ===============================

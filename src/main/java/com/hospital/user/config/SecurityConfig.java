@@ -15,18 +15,21 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
+                .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
 
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                             "/",
-                            "/css/**",
-                            "/js/**",
-                            "/images/**",
-                            "/swagger-ui/**",
-                            "/v3/api-docs/**",
-                            "/api/users/signup",
-                            "/api/users/login"
+                                "/",
+                                "/css/**",
+                                "/js/**",
+                                "/images/**",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/api/users/signup",
+                                "/api/users/login",
+                                "/api/users/**",
+                                "/api/doctors/**"
                         ).permitAll()
 
                         .anyRequest().authenticated()
