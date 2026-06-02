@@ -3,6 +3,7 @@ package com.hospital.user.controller;
 import com.hospital.user.dto.LoginRequest;
 import com.hospital.user.dto.LoginResponse;
 import com.hospital.user.dto.SignupRequest;
+import com.hospital.user.dto.UserResponse;
 import com.hospital.user.service.UserService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
