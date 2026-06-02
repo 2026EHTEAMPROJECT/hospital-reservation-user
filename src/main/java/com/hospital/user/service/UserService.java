@@ -1,6 +1,7 @@
 package com.hospital.user.service;
 
 import com.hospital.user.domain.User;
+import com.hospital.user.dto.LoginRequest;
 import com.hospital.user.dto.SignupRequest;
 import com.hospital.user.dto.LoginRequest;
 import com.hospital.user.dto.LoginResponse;
