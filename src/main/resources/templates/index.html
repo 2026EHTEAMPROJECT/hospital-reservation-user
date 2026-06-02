@@ -155,6 +155,10 @@
                                     <span class="info-label">이메일</span>
                                     <span class="info-value" id="profile-username">-</span>
                                 </div>
+                                <div class="info-row">
+                                    <span class="info-label">전화번호</span>
+                                    <span class="info-value" id="profile-phone">-</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -172,6 +176,55 @@
                     </div>
                 </div>
             </section>
+            <!-- 결제 모달 (Payment Modal) -->
+            <div id="payment-modal" class="modal-overlay hidden">
+                <div class="modal-box">
+                    <div class="modal-header">
+                        <h3>💳 진료 예약금 결제</h3>
+                        <button type="button" id="btn-close-payment" class="modal-close-btn">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="payment-summary">
+                            <div class="summary-row">
+                                <span class="summary-label">진료 예약금</span>
+                                <span class="summary-value" style="color: var(--primary-color); font-weight: 700;">10,000 원</span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="summary-label">의료진</span>
+                                <span id="payment-doctor-name" class="summary-value">-</span>
+                            </div>
+                            <div class="summary-row">
+                                <span class="summary-label">예약 일시</span>
+                                <span id="payment-booking-datetime" class="summary-value">-</span>
+                            </div>
+                        </div>
+                        
+                        <div class="payment-methods">
+                            <h4>결제 수단 선택</h4>
+                            <div class="methods-grid">
+                                <label class="method-item selected">
+                                    <input type="radio" name="payment-method" value="CARD" checked>
+                                    <span class="method-icon">💳</span>
+                                    <span class="method-name">신용/체크카드</span>
+                                </label>
+                                <label class="method-item">
+                                    <input type="radio" name="payment-method" value="KAKAO">
+                                    <span class="method-icon">💛</span>
+                                    <span class="method-name">카카오페이</span>
+                                </label>
+                                <label class="method-item">
+                                    <input type="radio" name="payment-method" value="TOSS">
+                                    <span class="method-icon">💙</span>
+                                    <span class="method-name">토스페이</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="btn-pay-submit" class="btn btn-primary w-100">10,000원 결제 및 예약 신청</button>
+                    </div>
+                </div>
+            </div>
         </main>
     </div>
     
