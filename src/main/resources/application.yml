@@ -5,6 +5,12 @@ spring:
   application:
     name: user-service
 
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_ISSUER_URI:http://keycloak.hospital-dev.svc.cluster.local:8080/realms/hospital}
+
   datasource:
     url: jdbc:mysql://${MYSQL_HOST:localhost}:3306/hospital_user?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Seoul
     username: ${MYSQL_USER:root}
