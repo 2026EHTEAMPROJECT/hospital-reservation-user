@@ -15,6 +15,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
+                .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
 
                 .authorizeHttpRequests(auth -> auth
@@ -27,8 +28,8 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/api/users/signup",
                                 "/api/users/login",
-                                "/api/users/{id}",
-                                "/api/doctors/{id}"
+                                "/api/users/**",
+                                "/api/doctors/**"
                         ).permitAll()
 
                         .anyRequest().authenticated()
