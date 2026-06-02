@@ -875,7 +875,9 @@ async function handleBookingSubmit(e) {
                     bookingData.doctor_id,
 
                 scheduleId:
-                    bookingData.schedule_id
+                    bookingData.schedule_id,
+
+                amount: 10000
             };
 
             const res =
