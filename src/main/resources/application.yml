@@ -32,9 +32,6 @@ spring:
     init:
       mode: always
 
-jwt:
-  secret: ${JWT_SECRET:hospitalSecretKey123456789012345678}
-  expiration: 86400000
 
 management:
   endpoints:

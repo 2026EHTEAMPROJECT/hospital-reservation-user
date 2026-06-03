@@ -129,6 +129,17 @@ const DOM = {
 let isLoginMode = true;
 
 // ===============================
+// 🔑 JWT DECODE HELPER
+// ===============================
+function decodeJwt(t) {
+    try {
+        return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    } catch (e) {
+        return {};
+    }
+}
+
+// ===============================
 // 🚀 INIT
 // ===============================
 function init() {
@@ -157,7 +168,15 @@ function setupEventListeners() {
 
     DOM.toggleAuthBtn.addEventListener('click', (e) => {
         e.preventDefault();
-        toggleAuthMode();
+        if (isLoginMode) {
+            // 회원가입은 Keycloak 내장 회원가입 페이지로 이동
+            window.location.href =
+                'http://keycloak.local/realms/hospital/protocol/openid-connect/registrations' +
+                '?client_id=hospital-frontend&response_type=code' +
+                '&redirect_uri=http%3A%2F%2Flocalhost';
+        } else {
+            toggleAuthMode();
+        }
     });
 
     DOM.authForm.addEventListener(
@@ -358,11 +377,14 @@ async function handleAuthSubmit(e) {
             DOM.authForm.reset();
             navigate('dashboard');
         } else {
-            // ================= LOGIN =================
+            // ================= LOGIN (Keycloak / login-service) =================
             if (isLoginMode) {
-                const res = await apiFetch('/users/login', {
+                // 게이트웨이가 /api/login 을 login-service로 라우팅한다(상대경로 사용).
+                // Keycloak password grant는 username 필드를 받으며, realm에 loginWithEmailAllowed=true라 이메일도 허용된다.
+                const res = await fetch('/api/login', {
                     method: 'POST',
-                    body: JSON.stringify({ email, password })
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: email, password })
                 });
 
                 if (!res.ok) {
@@ -371,11 +393,15 @@ async function handleAuthSubmit(e) {
 
                 const data = await res.json();
 
-                saveAuth(data.token, {
-                    id: data.id,
-                    email: data.email,
-                    name: data.name,
-                    role: data.role
+                // Keycloak access_token JWT payload에서 사용자 정보 추출
+                // (Keycloak 토큰에는 id/email/name/role 최상위 필드가 없으므로 디코드 필요)
+                const claims = decodeJwt(data.access_token);
+                // NOTE: Keycloak sub(UUID)와 백엔드 patientId(Long) 식별자 매핑은 후속 과제
+                saveAuth(data.access_token, {
+                    id: claims.sub,
+                    email: claims.email,
+                    name: claims.name || claims.preferred_username,
+                    role: (claims.realm_access?.roles || [])[0]
                 });
 
                 connectNotification();
@@ -383,25 +409,13 @@ async function handleAuthSubmit(e) {
                 navigate('dashboard');
             } else {
                 // ================= SIGNUP =================
-                const payload = {
-                    email,
-                    password,
-                    name: document.getElementById('name').value,
-                    role: 'PATIENT'
-                };
-
-                const res = await apiFetch('/users/signup', {
-                    method: 'POST',
-                    body: JSON.stringify(payload)
-                });
-
-                if (!res.ok) {
-                    throw new Error('회원가입 실패');
-                }
-
-                showToast('회원가입 성공!');
-                DOM.authForm.reset();
-                toggleAuthMode();
+                // 회원가입은 Keycloak 내장 회원가입 페이지를 통해 진행됩니다.
+                // toggleAuthMode() 대신 Keycloak registration 페이지로 이동합니다.
+                const keycloakRegistrationUrl =
+                    'http://keycloak.local/realms/hospital/protocol/openid-connect/registrations' +
+                    '?client_id=hospital-frontend&response_type=code' +
+                    '&redirect_uri=http%3A%2F%2Flocalhost';
+                window.location.href = keycloakRegistrationUrl;
             }
         }
     } catch (error) {
