@@ -6,8 +6,15 @@
 // ===============================
 // ⚙️ 설정
 // ===============================
-const USE_MOCK = false;
 const API_BASE_URL = 'http://localhost:8081/api';
+
+// ===============================
+// 🛡️ XSS 방지 헬퍼
+// ===============================
+function escapeHtml(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
+}
 
 // ===============================
 // 🗄️ 상태 관리
@@ -19,61 +26,6 @@ const state = {
     reservations: [],
     selectedDoctor: null,
     notificationSource: null
-};
-
-// ===============================
-// 🧪 MOCK DATA (가상 테스트용 데이터베이스)
-// ===============================
-const MOCK_DATA = {
-    token: 'mock-jwt-token.abc.123',
-
-    user: {
-        id: 1,
-        email: 'test@hospital.com',
-        name: '홍길동',
-        role: 'PATIENT',
-        created_at: new Date().toISOString()
-    },
-
-    doctors: [
-        {
-            id: 101,
-            name: '김의사',
-            department: '내과',
-            hospital_name: '메디컬플러스 서울병원',
-            available: true
-        },
-        {
-            id: 102,
-            name: '이의사',
-            department: '정형외과',
-            hospital_name: '메디컬플러스 서울병원',
-            available: true
-        },
-        {
-            id: 103,
-            name: '박의사',
-            department: '이비인후과',
-            hospital_name: '메디컬플러스 부산병원',
-            available: false
-        }
-    ],
-
-    reservations: [
-        {
-            id: 1,
-            patient_id: 1,
-            doctor_id: 101,
-            schedule_id: 10,
-            doctor_name: '김의사',
-            department: '내과',
-            date: '2026-05-20',
-            time: '10:00',
-            status: 'CONFIRMED',
-            reservation_time: new Date().toISOString(),
-            created_at: new Date().toISOString()
-        }
-    ]
 };
 
 // ===============================
@@ -358,65 +310,45 @@ async function handleAuthSubmit(e) {
             }
         }
 
-        // ================= MOCK =================
-        if (USE_MOCK) {
-            await simulateDelay(800);
+        // ================= LOGIN (Keycloak / login-service) =================
+        if (isLoginMode) {
+            // 게이트웨이가 /api/login 을 login-service로 라우팅한다(상대경로 사용).
+            // Keycloak password grant는 username 필드를 받으며, realm에 loginWithEmailAllowed=true라 이메일도 허용된다.
+            const res = await fetch('/api/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: email, password })
+            });
 
-            const user = {
-                ...MOCK_DATA.user,
-                email
-            };
-
-            if (!isLoginMode) {
-                user.name = document.getElementById('name').value;
-                user.phone = document.getElementById('phone').value;
+            if (!res.ok) {
+                throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.');
             }
 
-            saveAuth(MOCK_DATA.token, user);
-            showToast(isLoginMode ? '로그인 되었습니다.' : '회원가입이 완료되었습니다.');
-            DOM.authForm.reset();
+            const data = await res.json();
+
+            // Keycloak access_token JWT payload에서 사용자 정보 추출
+            // (Keycloak 토큰에는 id/email/name/role 최상위 필드가 없으므로 디코드 필요)
+            const claims = decodeJwt(data.access_token);
+            // NOTE: Keycloak sub(UUID)와 백엔드 patientId(Long) 식별자 매핑은 후속 과제
+            saveAuth(data.access_token, {
+                id: claims.sub,
+                email: claims.email,
+                name: claims.name || claims.preferred_username,
+                role: (claims.realm_access?.roles || [])[0]
+            });
+
+            connectNotification();
+            showToast('로그인 성공');
             navigate('dashboard');
         } else {
-            // ================= LOGIN (Keycloak / login-service) =================
-            if (isLoginMode) {
-                // 게이트웨이가 /api/login 을 login-service로 라우팅한다(상대경로 사용).
-                // Keycloak password grant는 username 필드를 받으며, realm에 loginWithEmailAllowed=true라 이메일도 허용된다.
-                const res = await fetch('/api/login', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username: email, password })
-                });
-
-                if (!res.ok) {
-                    throw new Error('이메일 또는 비밀번호가 올바르지 않습니다.');
-                }
-
-                const data = await res.json();
-
-                // Keycloak access_token JWT payload에서 사용자 정보 추출
-                // (Keycloak 토큰에는 id/email/name/role 최상위 필드가 없으므로 디코드 필요)
-                const claims = decodeJwt(data.access_token);
-                // NOTE: Keycloak sub(UUID)와 백엔드 patientId(Long) 식별자 매핑은 후속 과제
-                saveAuth(data.access_token, {
-                    id: claims.sub,
-                    email: claims.email,
-                    name: claims.name || claims.preferred_username,
-                    role: (claims.realm_access?.roles || [])[0]
-                });
-
-                connectNotification();
-                showToast('로그인 성공');
-                navigate('dashboard');
-            } else {
-                // ================= SIGNUP =================
-                // 회원가입은 Keycloak 내장 회원가입 페이지를 통해 진행됩니다.
-                // toggleAuthMode() 대신 Keycloak registration 페이지로 이동합니다.
-                const keycloakRegistrationUrl =
-                    'http://keycloak.local/realms/hospital/protocol/openid-connect/registrations' +
-                    '?client_id=hospital-frontend&response_type=code' +
-                    '&redirect_uri=http%3A%2F%2Flocalhost';
-                window.location.href = keycloakRegistrationUrl;
-            }
+            // ================= SIGNUP =================
+            // 회원가입은 Keycloak 내장 회원가입 페이지를 통해 진행됩니다.
+            // toggleAuthMode() 대신 Keycloak registration 페이지로 이동합니다.
+            const keycloakRegistrationUrl =
+                'http://keycloak.local/realms/hospital/protocol/openid-connect/registrations' +
+                '?client_id=hospital-frontend&response_type=code' +
+                '&redirect_uri=http%3A%2F%2Flocalhost';
+            window.location.href = keycloakRegistrationUrl;
         }
     } catch (error) {
         console.error(error);
@@ -497,15 +429,9 @@ async function loadDoctors() {
     showLoader();
 
     try {
-        if (USE_MOCK) {
-            await simulateDelay(500);
-            state.doctors = MOCK_DATA.doctors;
-            renderDoctors();
-        } else {
-            const res = await apiFetch('/doctors');
-            state.doctors = await res.json();
-            renderDoctors();
-        }
+        const res = await apiFetch('/doctors');
+        state.doctors = await res.json();
+        renderDoctors();
     } catch (error) {
         showToast('의료진 목록을 불러오지 못했습니다.');
     } finally {
@@ -523,11 +449,11 @@ function renderDoctors() {
         const div = document.createElement('div');
         div.className = `list-item doctor-item ${!doctor.available ? 'disabled-area' : ''}`;
         div.innerHTML = `
-            <span class="doctor-dept">${doctor.department}</span>
+            <span class="doctor-dept">${escapeHtml(doctor.department)}</span>
             <div class="doctor-info">
-                <h4>${doctor.name} 전문의</h4>
+                <h4>${escapeHtml(doctor.name)} 전문의</h4>
                 <p class="doctor-desc">
-                    ${doctor.hospitalName || doctor.hospital_name}
+                    ${escapeHtml(doctor.hospitalName || doctor.hospital_name)}
                     ${doctor.available ? '' : '(예약불가)'}
                 </p>
             </div>
@@ -552,10 +478,10 @@ function selectDoctor(doctor, element) {
 
     DOM.selectedDoctorDisplay.innerHTML = `
         <h4 style="color:var(--primary-dark); margin-bottom:0.2rem;">
-            선택된 의료진: ${doctor.name} (${doctor.department})
+            선택된 의료진: ${escapeHtml(doctor.name)} (${escapeHtml(doctor.department)})
         </h4>
         <p style="font-size:0.9rem;">
-            ${doctor.hospitalName || doctor.hospital_name}
+            ${escapeHtml(doctor.hospitalName || doctor.hospital_name)}
         </p>
     `;
 
@@ -640,60 +566,26 @@ async function handleBookingSubmit(e) {
             };
 
             try {
-                if (USE_MOCK) {
-                    await simulateDelay(1000);
+                const payload = {
+                    patientId: bookingData.patient_id,
+                    doctorId: bookingData.doctor_id,
+                    scheduleId: bookingData.schedule_id,
+                    amount: 10000
+                };
 
-                    const duplicate = MOCK_DATA.reservations.find(
-                        r =>
-                            r.doctor_id === bookingData.doctor_id &&
-                            r.date === bookingData.date &&
-                            r.time === bookingData.time &&
-                            r.status !== 'CANCELED'
-                    );
+                const res = await apiFetch('/reservations', {
+                    method: 'POST',
+                    body: JSON.stringify(payload)
+                });
 
-                    if (duplicate) {
-                        throw new Error('이미 예약된 시간입니다.');
-                    }
-
-                    const newReservation = {
-                        id: Date.now(),
-                        patient_id: state.user.id,
-                        doctor_id: state.selectedDoctor.id,
-                        schedule_id: scheduleId,
-                        doctor_name: state.selectedDoctor.name,
-                        department: state.selectedDoctor.department,
-                        date: bookingData.date,
-                        time: bookingData.time,
-                        status: 'WAITING',
-                        reservation_time: new Date().toISOString(),
-                        created_at: new Date().toISOString()
-                    };
-
-                    MOCK_DATA.reservations.push(newReservation);
-                    showToast('예약금 10,000원 결제 완료 및 예약 신청이 완료되었습니다.');
-                    navigate('mypage');
-                } else {
-                    const payload = {
-                        patientId: bookingData.patient_id,
-                        doctorId: bookingData.doctor_id,
-                        scheduleId: bookingData.schedule_id,
-                        amount: 10000
-                    };
-
-                    const res = await apiFetch('/reservations', {
-                        method: 'POST',
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (!res.ok) {
-                        throw new Error('예약 신청에 실패했습니다.');
-                    }
-
-                    const reservationData = await res.json();
-
-                    showToast('예약금 10,000원 결제 완료 및 예약 신청이 접수되었습니다.');
-                    navigate('mypage');
+                if (!res.ok) {
+                    throw new Error('예약 신청에 실패했습니다.');
                 }
+
+                const reservationData = await res.json();
+
+                showToast('예약금 10,000원 결제 완료 및 예약 신청이 접수되었습니다.');
+                navigate('mypage');
             } catch (error) {
                 showToast(error.message);
             } finally {
@@ -728,23 +620,15 @@ async function loadMyBookings() {
     showLoader();
 
     try {
-        if (USE_MOCK) {
-            await simulateDelay(500);
-            state.reservations = [...MOCK_DATA.reservations].reverse();
-            renderBookings();
-        } else {
-            const res = await apiFetch(
-                state.user?.role === 'ADMIN'
-                    ? '/reservations'
-                    : `/reservations/patient/${state.user.id}`
-            );
+        const res = await apiFetch(
+            state.user?.role === 'ADMIN'
+                ? '/reservations'
+                : `/reservations/patient/${state.user.id}`
+        );
 
-            console.log('status=', res.status);
-            const data = await res.json();
-            console.log('data=', data);
-            state.reservations = data;
-            renderBookings();
-        }
+        const data = await res.json();
+        state.reservations = data;
+        renderBookings();
     } catch (error) {
         console.error(error);
         showToast('예약 내역을 불러오지 못했습니다.');
@@ -802,27 +686,27 @@ function renderBookings() {
 
         div.innerHTML = `
             <div class="booking-header">
-                <strong>${department} - ${doctorName} 전문의</strong>
-                <span class="badge ${reservation.status}">${statusText}</span>
+                <strong>${escapeHtml(department)} - ${escapeHtml(doctorName)} 전문의</strong>
+                <span class="badge ${escapeHtml(reservation.status)}">${escapeHtml(statusText)}</span>
             </div>
 
             <div class="booking-details">
                 <p>📅 예약번호: ${reservation.id} | ⏰ 스케줄: ${reservation.scheduleId || reservation.schedule_id}</p>
-                <p>⏰ 진료시간: ${reservation.date} ${reservation.time}</p>
+                <p>⏰ 진료시간: ${escapeHtml(reservation.date)} ${escapeHtml(reservation.time)}</p>
                 <p>💳 결제정보: 예약금 10,000원 (결제 완료)</p>
-                
+
                 ${
                     isAdmin
-                        ? `<p>👤 신청환자: ${reservation.patientName || '환자 ID: ' + (reservation.patientId || reservation.patient_id)}</p>`
+                        ? `<p>👤 신청환자: ${escapeHtml(reservation.patientName) || '환자 ID: ' + (reservation.patientId || reservation.patient_id)}</p>`
                         : ''
                 }
-                
+
                 <p style="font-size:0.8rem; color:var(--text-muted);">
                     신청일: ${reservation.createdAt || reservation.created_at
                         ? new Date(reservation.createdAt || reservation.created_at).toLocaleString()
                         : '-'}
                 </p>
-                
+
                 ${
                     isAdmin
                         ? `
@@ -872,10 +756,6 @@ function showToast(message) {
     }, 3000);
 }
 
-function simulateDelay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
 // ===============================
 // 🌐 MSA API FETCH 라우팅
 // ===============================
@@ -914,40 +794,30 @@ window.cancelBooking = async function(reservationId) {
 
     showLoader();
     try {
-        if (USE_MOCK) {
-            await simulateDelay(600);
-            const idx = MOCK_DATA.reservations.findIndex(b => b.id === reservationId);
-            if (idx > -1) {
-                MOCK_DATA.reservations[idx].status = 'CANCELED';
-            }
-            showToast('예약이 취소되었으며 예약금이 정상 환불되었습니다.');
-            loadMyBookings();
-        } else {
-            const res = await apiFetch(`/reservations/${reservationId}/cancel`, {
-                method: 'PUT'
-            });
+        const res = await apiFetch(`/reservations/${reservationId}/cancel`, {
+            method: 'PUT'
+        });
 
-            if (!res.ok) {
-                throw new Error('예약 취소 실패');
-            }
-
-            const refundPayload = {
-                reservationId: reservationId,
-                amount: 10000
-            };
-
-            const refundRes = await apiFetch('/payments/refund', {
-                method: 'POST',
-                body: JSON.stringify(refundPayload)
-            });
-
-            if (!refundRes.ok) {
-                console.warn('환불 처리 API 실패');
-            }
-
-            showToast('예약이 취소되었으며 예약금이 자동 환불되었습니다.');
-            loadMyBookings();
+        if (!res.ok) {
+            throw new Error('예약 취소 실패');
         }
+
+        const refundPayload = {
+            reservationId: reservationId,
+            amount: 10000
+        };
+
+        const refundRes = await apiFetch('/payments/refund', {
+            method: 'POST',
+            body: JSON.stringify(refundPayload)
+        });
+
+        if (!refundRes.ok) {
+            console.warn('환불 처리 API 실패');
+        }
+
+        showToast('예약이 취소되었으며 예약금이 자동 환불되었습니다.');
+        loadMyBookings();
     } catch (error) {
         showToast(error.message);
     } finally {
@@ -961,26 +831,16 @@ window.cancelBooking = async function(reservationId) {
 async function confirmReservation(id) {
     showLoader();
     try {
-        if (USE_MOCK) {
-            await simulateDelay(500);
-            const idx = MOCK_DATA.reservations.findIndex(r => r.id === id);
-            if (idx > -1) {
-                MOCK_DATA.reservations[idx].status = 'CONFIRMED';
-            }
-            showToast('예약 승인 완료 (예약 확정)');
-            loadMyBookings();
-        } else {
-            const res = await apiFetch(`/reservations/${id}/confirm`, {
-                method: 'PUT'
-            });
+        const res = await apiFetch(`/reservations/${id}/confirm`, {
+            method: 'PUT'
+        });
 
-            if (!res.ok) {
-                throw new Error('예약 승인 실패');
-            }
-
-            showToast('예약 승인 완료');
-            loadMyBookings();
+        if (!res.ok) {
+            throw new Error('예약 승인 실패');
         }
+
+        showToast('예약 승인 완료');
+        loadMyBookings();
     } catch (error) {
         showToast(error.message);
     } finally {
@@ -996,40 +856,30 @@ async function cancelReservation(id) {
 
     showLoader();
     try {
-        if (USE_MOCK) {
-            await simulateDelay(500);
-            const idx = MOCK_DATA.reservations.findIndex(r => r.id === id);
-            if (idx > -1) {
-                MOCK_DATA.reservations[idx].status = 'CANCELED';
-            }
-            showToast('예약이 거절되었으며 예약금이 자동 환불되었습니다.');
-            loadMyBookings();
-        } else {
-            const res = await apiFetch(`/reservations/${id}/cancel`, {
-                method: 'PUT'
-            });
+        const res = await apiFetch(`/reservations/${id}/cancel`, {
+            method: 'PUT'
+        });
 
-            if (!res.ok) {
-                throw new Error('예약 취소 실패');
-            }
-
-            const refundPayload = {
-                reservationId: id,
-                amount: 10000
-            };
-
-            const refundRes = await apiFetch('/payments/refund', {
-                method: 'POST',
-                body: JSON.stringify(refundPayload)
-            });
-
-            if (!refundRes.ok) {
-                console.warn('관리자 거절에 따른 환불 처리 API 실패');
-            }
-
-            showToast('예약 거절 및 예약금 자동 환불 완료');
-            loadMyBookings();
+        if (!res.ok) {
+            throw new Error('예약 취소 실패');
         }
+
+        const refundPayload = {
+            reservationId: id,
+            amount: 10000
+        };
+
+        const refundRes = await apiFetch('/payments/refund', {
+            method: 'POST',
+            body: JSON.stringify(refundPayload)
+        });
+
+        if (!refundRes.ok) {
+            console.warn('관리자 거절에 따른 환불 처리 API 실패');
+        }
+
+        showToast('예약 거절 및 예약금 자동 환불 완료');
+        loadMyBookings();
     } catch (error) {
         showToast(error.message);
     } finally {
