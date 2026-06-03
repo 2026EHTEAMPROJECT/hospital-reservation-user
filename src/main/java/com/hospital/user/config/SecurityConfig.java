@@ -7,8 +7,6 @@ import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.security.web.SecurityFilterChain;
@@ -31,9 +29,7 @@ public class SecurityConfig {
                                 "/",
                                 "/css/**", "/js/**", "/images/**",
                                 "/swagger-ui/**", "/v3/api-docs/**",
-                                "/actuator/**",
-                                "/api/users/signup",
-                                "/api/users/login"
+                                "/actuator/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
@@ -50,7 +46,9 @@ public class SecurityConfig {
             Object realmAccess = jwt.getClaim("realm_access");
             if (realmAccess instanceof Map<?, ?> ra && ra.get("roles") instanceof Collection<?> roles) {
                 for (Object role : roles) {
-                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role));
+                    if (role instanceof String s && !s.isBlank()) {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_" + s));
+                    }
                 }
             }
             return authorities;
@@ -58,8 +56,4 @@ public class SecurityConfig {
         return converter;
     }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
-    }
 }
