@@ -6,7 +6,7 @@
 // ===============================
 // ⚙️ 설정
 // ===============================
-const API_BASE_URL = 'http://localhost:8081/api';
+const API_BASE_URL = '/api';
 
 // ===============================
 // 🛡️ XSS 방지 헬퍼
@@ -25,6 +25,7 @@ const state = {
     doctors: [],
     reservations: [],
     selectedDoctor: null,
+    availableSlots: [],
     notificationSource: null
 };
 
@@ -125,7 +126,7 @@ function setupEventListeners() {
             window.location.href =
                 'http://localhost:8080/realms/hospital/protocol/openid-connect/registrations' +
                 '?client_id=hospital-frontend&response_type=code' +
-                '&redirect_uri=http%3A%2F%2Flocalhost%3A8081%2F';
+                '&redirect_uri=' + encodeURIComponent(window.location.origin + '/');
         } else {
             toggleAuthMode();
         }
@@ -347,7 +348,7 @@ async function handleAuthSubmit(e) {
             const keycloakRegistrationUrl =
                 'http://localhost:8080/realms/hospital/protocol/openid-connect/registrations' +
                 '?client_id=hospital-frontend&response_type=code' +
-                '&redirect_uri=http%3A%2F%2Flocalhost%3A8081%2F';
+                '&redirect_uri=' + encodeURIComponent(window.location.origin + '/');
             window.location.href = keycloakRegistrationUrl;
         }
     } catch (error) {
@@ -379,8 +380,9 @@ function connectNotification() {
         state.notificationSource.close();
     }
 
+    // EventSource는 Authorization 헤더 못 실어 인증 보호된 경로면 401 가능(알림은 best-effort)
     state.notificationSource = new EventSource(
-        `http://localhost:8084/notifications/stream?patientId=${state.user.id}`
+        `/notifications/stream?patientId=${state.user.id}`
     );
 
     state.notificationSource.addEventListener('connect', (event) => {
@@ -483,11 +485,12 @@ function renderDoctors() {
 // ===============================
 // 👨‍⚕️ SELECT DOCTOR
 // ===============================
-function selectDoctor(doctor, element) {
+async function selectDoctor(doctor, element) {
     document.querySelectorAll('.doctor-item').forEach(el => el.classList.remove('selected'));
     element.classList.add('selected');
 
     state.selectedDoctor = doctor;
+    state.availableSlots = [];
 
     DOM.selectedDoctorDisplay.innerHTML = `
         <h4>선택된 의료진: ${escapeHtml(doctor.name)} (${escapeHtml(doctor.department)})</h4>
@@ -496,13 +499,70 @@ function selectDoctor(doctor, element) {
 
     DOM.bookingInputs.classList.add('active');
 
-    const today = new Date().toISOString().split('T')[0];
-    DOM.bookingDate.setAttribute('min', today);
+    // 날짜 입력란은 슬롯에서 자동으로 채우므로 readonly 처리
+    DOM.bookingDate.setAttribute('readonly', 'true');
+    DOM.bookingDate.style.display = 'none';
+    const dateLabel = DOM.bookingDate.closest('.input-group');
+    if (dateLabel) dateLabel.style.display = 'none';
 
-    DOM.bookingDate.disabled = false;
-    DOM.bookingTime.disabled = false;
-    DOM.symptoms.disabled = false;
-    DOM.btnBook.disabled = false;
+    // 슬롯 로딩 중 UI
+    DOM.bookingTime.disabled = true;
+    DOM.btnBook.disabled = true;
+    DOM.symptoms.disabled = true;
+
+    // booking-time select를 슬롯으로 채운다
+    DOM.bookingTime.innerHTML = '<option value="">예약 가능 시간 로딩 중...</option>';
+
+    showLoader();
+    try {
+        const res = await apiFetch(`/doctors/${doctor.id}/schedules`);
+        const slots = await res.json();
+        state.availableSlots = Array.isArray(slots) ? slots : [];
+
+        DOM.bookingTime.innerHTML = '';
+
+        if (state.availableSlots.length === 0) {
+            const opt = document.createElement('option');
+            opt.value = '';
+            opt.textContent = '예약 가능한 시간이 없습니다';
+            opt.disabled = true;
+            opt.selected = true;
+            DOM.bookingTime.appendChild(opt);
+            DOM.btnBook.disabled = true;
+        } else {
+            const placeholder = document.createElement('option');
+            placeholder.value = '';
+            placeholder.textContent = '시간 선택';
+            placeholder.disabled = true;
+            placeholder.selected = true;
+            DOM.bookingTime.appendChild(placeholder);
+
+            state.availableSlots.forEach(slot => {
+                const opt = document.createElement('option');
+                opt.value = slot.id;
+                opt.textContent = `${slot.date} ${slot.startTime}~${slot.endTime}`;
+                DOM.bookingTime.appendChild(opt);
+            });
+
+            DOM.bookingTime.disabled = false;
+            DOM.symptoms.disabled = false;
+            DOM.btnBook.disabled = false;
+        }
+    } catch (error) {
+        DOM.bookingTime.innerHTML = '<option value="" disabled selected>슬롯 조회 실패. 다시 시도해주세요.</option>';
+        DOM.btnBook.disabled = true;
+        showToast('예약 가능 시간을 불러오지 못했습니다.');
+    } finally {
+        hideLoader();
+    }
+
+    // 슬롯 선택 시 booking-date를 자동으로 채운다
+    DOM.bookingTime.onchange = function () {
+        const selectedSlot = state.availableSlots.find(s => s.id === parseInt(this.value));
+        if (selectedSlot) {
+            DOM.bookingDate.value = selectedSlot.date;
+        }
+    };
 }
 
 // ===============================
@@ -510,6 +570,7 @@ function selectDoctor(doctor, element) {
 // ===============================
 function resetBookingForm() {
     state.selectedDoctor = null;
+    state.availableSlots = [];
     DOM.bookingForm.reset();
 
     DOM.selectedDoctorDisplay.innerHTML = `
@@ -519,6 +580,16 @@ function resetBookingForm() {
     `;
 
     DOM.bookingInputs.classList.remove('active');
+
+    // booking-date 숨김 해제 (의사 재선택 시 selectDoctor가 다시 숨길 것임)
+    DOM.bookingDate.removeAttribute('readonly');
+    DOM.bookingDate.style.display = '';
+    const dateLabel = DOM.bookingDate.closest('.input-group');
+    if (dateLabel) dateLabel.style.display = '';
+
+    // booking-time select를 기본 상태로 초기화
+    DOM.bookingTime.innerHTML = '<option value="">시간 선택</option>';
+    DOM.bookingTime.onchange = null;
 
     DOM.bookingDate.disabled = true;
     DOM.bookingTime.disabled = true;
@@ -554,9 +625,23 @@ async function handleBookingSubmit(e) {
     e.preventDefault();
     if (!state.selectedDoctor) return;
 
-    const bookingDateStr = DOM.bookingDate.value;
-    const bookingTimeStr = DOM.bookingTime.value;
-    const datetimeText = `${bookingDateStr} ${bookingTimeStr}`;
+    // 선택된 슬롯 확인
+    const scheduleId = parseInt(DOM.bookingTime.value);
+    if (!scheduleId) {
+        showToast('예약 시간을 선택해주세요');
+        return;
+    }
+
+    const slot = state.availableSlots.find(s => s.id === scheduleId);
+    if (!slot) {
+        showToast('선택한 예약 시간 정보를 찾을 수 없습니다. 다시 선택해주세요.');
+        return;
+    }
+
+    // 슬롯에서 날짜/시간 파생
+    const bookingDateStr = slot.date;
+    const bookingTimeStr = slot.startTime;
+    const datetimeText = `${slot.date} ${slot.startTime}~${slot.endTime}`;
 
     openPaymentModal(
         `${state.selectedDoctor.name} 전문의 (${state.selectedDoctor.department})`,
@@ -565,20 +650,11 @@ async function handleBookingSubmit(e) {
             closePaymentModal();
             showLoader();
 
-            const scheduleId = Math.floor(Math.random() * 1000) + 1;
-            const bookingData = {
-                patient_id: state.user.id,
-                doctor_id: state.selectedDoctor.id,
-                schedule_id: scheduleId,
-                date: bookingDateStr,
-                time: bookingTimeStr
-            };
-
             try {
                 const payload = {
-                    patientId: bookingData.patient_id,
-                    doctorId: bookingData.doctor_id,
-                    scheduleId: bookingData.schedule_id,
+                    patientId: state.user.id,
+                    doctorId: state.selectedDoctor.id,
+                    scheduleId: scheduleId,
                     amount: 10000
                 };
 
@@ -591,9 +667,9 @@ async function handleBookingSubmit(e) {
                     throw new Error('예약 신청에 실패했습니다.');
                 }
 
-                const reservationData = await res.json();
+                await res.json();
 
-                showToast('예약금 10,000원 결제 완료 및 예약 신청이 접수되었습니다.');
+                showToast('예약이 접수되었습니다. 상태: 대기중');
                 navigate('mypage');
             } catch (error) {
                 showToast(error.message);
@@ -675,24 +751,24 @@ function renderBookings() {
         const doctorName = reservation.doctor_name || doctor?.name || '의사정보없음';
         const department = reservation.department || doctor?.department || '진료과정보없음';
 
-        let statusText = '';
-        switch (reservation.status) {
-            case 'WAITING':
-                statusText = '대기중';
-                break;
-            case 'CONFIRMED':
-                statusText = '예약확정';
-                break;
-            case 'CANCELED':
-                statusText = '취소됨';
-                break;
-            case 'PAYMENT_FAILED':
-                statusText = '결제실패';
-                break;
-            case 'REFUNDED':
-                statusText = '환불완료';
-                break;
-        }
+        // 상태 한글 라벨 + 배지 클래스
+        const STATUS_MAP = {
+            'WAITING':        { label: '대기중',   cls: 'WAITING' },
+            'CONFIRMED':      { label: '확정됨',   cls: 'CONFIRMED' },
+            'CANCELED':       { label: '취소됨',   cls: 'CANCELED' },
+            'PAYMENT_FAILED': { label: '결제실패', cls: 'PAYMENT_FAILED' },
+            'REFUNDED':       { label: '환불완료', cls: 'REFUNDED' },
+            'PAYMENT_SUCCESS':{ label: '결제완료', cls: 'PAYMENT_SUCCESS' }
+        };
+        const statusInfo = STATUS_MAP[reservation.status] || { label: reservation.status || '-', cls: '' };
+
+        // ReservationResponse가 반환하는 시간 필드는 reservationTime(예약 신청 시각)뿐이다.
+        // 진료 예정 슬롯 시각은 현재 booking 응답에 포함되지 않아 표시할 수 없다(후속 과제).
+        // 따라서 신청일시를 한국어 형식으로 표시한다.
+        const appliedAt = reservation.reservationTime || reservation.createdAt || '';
+        const datetimeDisplay = appliedAt
+            ? escapeHtml(new Date(appliedAt).toLocaleString('ko-KR'))
+            : '-';
 
         const div = document.createElement('div');
         div.className = 'list-item booking-item';
@@ -702,12 +778,12 @@ function renderBookings() {
         div.innerHTML = `
             <div class="booking-header">
                 <strong>${escapeHtml(department)} - ${escapeHtml(doctorName)} 전문의</strong>
-                <span class="badge ${escapeHtml(reservation.status)}">${escapeHtml(statusText)}</span>
+                <span class="badge ${escapeHtml(statusInfo.cls)}" aria-label="예약 상태: ${escapeHtml(statusInfo.label)}">${escapeHtml(statusInfo.label)}</span>
             </div>
 
             <div class="booking-details">
-                <p>📅 예약번호: ${reservation.id} | ⏰ 스케줄: ${reservation.scheduleId || reservation.schedule_id}</p>
-                <p>⏰ 진료시간: ${escapeHtml(reservation.date)} ${escapeHtml(reservation.time)}</p>
+                <p>📋 예약번호: ${reservation.id}</p>
+                <p>📅 신청일시: ${datetimeDisplay}</p>
                 <p>💳 결제정보: 예약금 10,000원 (결제 완료)</p>
 
                 ${
@@ -718,7 +794,7 @@ function renderBookings() {
 
                 <p class="booking-created-at">
                     신청일: ${reservation.createdAt || reservation.created_at
-                        ? new Date(reservation.createdAt || reservation.created_at).toLocaleString()
+                        ? new Date(reservation.createdAt || reservation.created_at).toLocaleString('ko-KR')
                         : '-'}
                 </p>
 
@@ -786,13 +862,13 @@ async function apiFetch(url, options = {}) {
 
     let baseUrl = API_BASE_URL;
 
-    // 예약 관련 API는 booking-service (8082)
+    // 예약 관련 API → 게이트웨이 /api/reservations
     if (url.startsWith('/reservations')) {
-        baseUrl = 'http://localhost:8082/api';
+        baseUrl = '/api';
     }
-    // 결제 관련 API는 payment-service (8083)
+    // 결제 관련 API → 게이트웨이 /payments (컨트롤러 경로 그대로)
     else if (url.startsWith('/payments')) {
-        baseUrl = 'http://localhost:8083/api';
+        baseUrl = '';
     }
 
     return fetch(`${baseUrl}${url}`, {
