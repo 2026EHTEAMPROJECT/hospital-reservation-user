@@ -121,20 +121,14 @@
                                 </div>
 
                                 <div id="booking-inputs" class="disabled-area">
-                                    <div class="input-group">
+                                    <div class="input-group" style="display:none;">
                                         <label for="booking-date">예약 날짜</label>
-                                        <input type="date" id="booking-date" required disabled aria-required="true">
+                                        <input type="date" id="booking-date" readonly aria-hidden="true">
                                     </div>
                                     <div class="input-group">
-                                        <label for="booking-time">예약 시간</label>
+                                        <label for="booking-time">예약 가능 시간 선택</label>
                                         <select id="booking-time" required disabled aria-required="true">
-                                            <option value="">시간 선택</option>
-                                            <option value="09:00">09:00</option>
-                                            <option value="10:00">10:00</option>
-                                            <option value="11:00">11:00</option>
-                                            <option value="14:00">14:00</option>
-                                            <option value="15:00">15:00</option>
-                                            <option value="16:00">16:00</option>
+                                            <option value="">의사를 먼저 선택하세요</option>
                                         </select>
                                     </div>
                                     <div class="input-group">
