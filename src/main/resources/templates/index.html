@@ -4,87 +4,98 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>MedicalCare+ | 병원 예약 시스템</title>
-    <!-- CSS 연결 -->
     <link rel="stylesheet" href="/css/style.css">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
 <body>
     <div id="app">
         <!-- Navigation -->
-        <nav class="navbar">
-            <div class="container nav-container">
-                <div class="logo">MedicalCare<span class="plus">+</span></div>
+        <nav class="navbar" role="navigation" aria-label="주요 내비게이션">
+            <div class="nav-container">
+                <div class="logo" aria-label="MedicalCare+">
+                    MedicalCare<span class="plus">+</span>
+                </div>
                 <div class="nav-links">
-                    <a href="#" id="nav-home" class="hidden">홈 (예약하기)</a>
-                    <a href="#" id="nav-mypage" class="hidden">마이페이지</a>
-                    <a href="#" id="nav-logout" class="hidden btn-outline">로그아웃</a>
+                    <a href="#" id="nav-home" class="hidden" aria-label="홈으로 이동">홈</a>
+                    <a href="#" id="nav-mypage" class="hidden" aria-label="마이페이지로 이동">마이페이지</a>
+                    <a href="#" id="nav-logout" class="hidden btn-outline" aria-label="로그아웃">로그아웃</a>
                 </div>
             </div>
         </nav>
 
-        <main class="main-content">
+        <main class="main-content" role="main">
             <!-- Loader -->
-            <div id="loader" class="loader-overlay hidden">
+            <div id="loader" class="loader-overlay hidden" role="status" aria-label="로딩 중">
                 <div class="spinner"></div>
             </div>
 
             <!-- Toast Notification -->
-            <div id="toast" class="toast hidden"></div>
+            <div id="toast" class="toast hidden" role="alert" aria-live="polite"></div>
 
-            <!-- Auth Section (Login & Signup) -->
-            <section id="auth-section" class="section-container">
+            <!-- Auth Section -->
+            <section id="auth-section" class="section-container" aria-label="로그인">
                 <div class="auth-box">
+                    <!-- Medical cross icon -->
+                    <div class="auth-logo-mark" aria-hidden="true">
+                        <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                            <rect x="18" y="4" width="12" height="40" rx="4"/>
+                            <rect x="4" y="18" width="40" height="12" rx="4"/>
+                        </svg>
+                    </div>
+
                     <h2 id="auth-title">로그인</h2>
                     <p class="auth-subtitle">예약을 위해 로그인해주세요.</p>
-                    <form id="auth-form">
+
+                    <form id="auth-form" novalidate>
                         <div class="input-group">
                             <label for="username">이메일</label>
-                            <input type="email" id="username" placeholder="이메일을 입력하세요" required>
+                            <input type="email" id="username" placeholder="이메일을 입력하세요" autocomplete="email" required>
                         </div>
                         <div class="input-group">
                             <label for="password">비밀번호</label>
-                            <input type="password" id="password" placeholder="비밀번호를 입력하세요" required>
+                            <input type="password" id="password" placeholder="비밀번호를 입력하세요" autocomplete="current-password" required>
                         </div>
-                        
+
                         <!-- Signup specific fields -->
                         <div id="signup-fields" class="hidden">
                             <div class="input-group">
                                 <label for="name">이름</label>
-                                <input type="text" id="name" placeholder="실명을 입력하세요">
+                                <input type="text" id="name" placeholder="실명을 입력하세요" autocomplete="name">
                             </div>
                             <div class="input-group">
                                 <label for="phone">전화번호</label>
-                                <input type="tel" id="phone" placeholder="010-0000-0000">
+                                <input type="tel" id="phone" placeholder="010-0000-0000" autocomplete="tel">
                             </div>
                         </div>
 
                         <button type="submit" class="btn btn-primary w-100" id="auth-submit-btn">로그인</button>
-                        
+
                         <div class="auth-switch">
                             <span id="auth-switch-text">계정이 없으신가요?</span>
-                            <a href="http://keycloak.local/realms/hospital/protocol/openid-connect/registrations?client_id=hospital-frontend&amp;response_type=code&amp;redirect_uri=http%3A%2F%2Flocalhost" id="toggle-auth-btn">회원가입하기</a>
+                            <a href="http://localhost:8080/realms/hospital/protocol/openid-connect/registrations?client_id=hospital-frontend&amp;response_type=code&amp;redirect_uri=http%3A%2F%2Flocalhost%3A8081%2F" id="toggle-auth-btn">회원가입하기</a>
                         </div>
                     </form>
                 </div>
             </section>
 
-            <!-- Dashboard Section (Doctors & Booking) -->
-            <section id="dashboard-section" class="section-container hidden">
+            <!-- Dashboard Section -->
+            <section id="dashboard-section" class="section-container hidden" aria-label="진료 예약 대시보드">
                 <div class="dashboard-header">
                     <h2>환영합니다, <span id="user-greeting">고객</span>님!</h2>
                     <p>원하시는 진료과목과 의료진을 선택해 예약해 보세요.</p>
                 </div>
-                
+
                 <div class="dashboard-grid">
                     <!-- Doctors List -->
                     <div class="card">
                         <div class="card-header">
-                            <h3>👨‍⚕️ 의료진 목록</h3>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+                                <path d="M16 3v4M8 3v4M12 12v4M10 14h4"/>
+                            </svg>
+                            <h3>의료진 목록</h3>
                         </div>
                         <div class="card-body">
-                            <div id="doctors-list" class="list-container">
+                            <div id="doctors-list" class="list-container" role="list" aria-label="의료진 목록">
                                 <!-- JS renders doctor items here -->
                             </div>
                         </div>
@@ -93,12 +104,18 @@
                     <!-- Booking Form -->
                     <div class="card">
                         <div class="card-header">
-                            <h3>📅 진료 예약</h3>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <rect x="3" y="4" width="18" height="18" rx="2"/>
+                                <line x1="16" y1="2" x2="16" y2="6"/>
+                                <line x1="8" y1="2" x2="8" y2="6"/>
+                                <line x1="3" y1="10" x2="21" y2="10"/>
+                            </svg>
+                            <h3>진료 예약</h3>
                         </div>
                         <div class="card-body">
-                            <form id="booking-form">
+                            <form id="booking-form" novalidate>
                                 <input type="hidden" id="selected-doctor-id">
-                                
+
                                 <div class="selected-doctor-display" id="selected-doctor-display">
                                     <p class="placeholder-text">먼저 왼쪽 목록에서 의료진을 선택해주세요.</p>
                                 </div>
@@ -106,11 +123,11 @@
                                 <div id="booking-inputs" class="disabled-area">
                                     <div class="input-group">
                                         <label for="booking-date">예약 날짜</label>
-                                        <input type="date" id="booking-date" required disabled>
+                                        <input type="date" id="booking-date" required disabled aria-required="true">
                                     </div>
                                     <div class="input-group">
                                         <label for="booking-time">예약 시간</label>
-                                        <select id="booking-time" required disabled>
+                                        <select id="booking-time" required disabled aria-required="true">
                                             <option value="">시간 선택</option>
                                             <option value="09:00">09:00</option>
                                             <option value="10:00">10:00</option>
@@ -121,8 +138,8 @@
                                         </select>
                                     </div>
                                     <div class="input-group">
-                                        <label for="symptoms">증상 메모 (선택)</label>
-                                        <textarea id="symptoms" rows="3" placeholder="간략한 증상을 적어주시면 진료에 도움이 됩니다." disabled></textarea>
+                                        <label for="symptoms">증상 메모 <span style="font-weight:400;color:var(--text-3)">(선택)</span></label>
+                                        <textarea id="symptoms" rows="3" placeholder="간략한 증상을 적어주시면 진료에 도움이 됩니다." disabled aria-multiline="true"></textarea>
                                     </div>
                                     <button type="submit" class="btn btn-primary w-100 mt-3" id="btn-book" disabled>예약 신청하기</button>
                                 </div>
@@ -133,7 +150,7 @@
             </section>
 
             <!-- MyPage Section -->
-            <section id="mypage-section" class="section-container hidden">
+            <section id="mypage-section" class="section-container hidden" aria-label="마이페이지">
                 <div class="dashboard-header">
                     <h2>마이페이지</h2>
                     <p>나의 프로필 정보와 예약 상태를 확인하고 관리할 수 있습니다.</p>
@@ -143,7 +160,11 @@
                     <!-- Profile Card -->
                     <div class="card">
                         <div class="card-header">
-                            <h3>👤 내 프로필</h3>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <circle cx="12" cy="8" r="4"/>
+                                <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/>
+                            </svg>
+                            <h3>내 프로필</h3>
                         </div>
                         <div class="card-body">
                             <div class="profile-info">
@@ -166,28 +187,35 @@
                     <!-- Bookings List Card -->
                     <div class="card">
                         <div class="card-header">
-                            <h3>📑 예약 내역</h3>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+                                <rect x="9" y="3" width="6" height="4" rx="1"/>
+                                <line x1="9" y1="12" x2="15" y2="12"/>
+                                <line x1="9" y1="16" x2="13" y2="16"/>
+                            </svg>
+                            <h3>예약 내역</h3>
                         </div>
                         <div class="card-body">
-                            <div id="bookings-list" class="list-container">
+                            <div id="bookings-list" class="list-container" role="list" aria-label="예약 내역 목록">
                                 <!-- JS renders bookings here -->
                             </div>
                         </div>
                     </div>
                 </div>
             </section>
-            <!-- 결제 모달 (Payment Modal) -->
-            <div id="payment-modal" class="modal-overlay hidden">
+
+            <!-- Payment Modal -->
+            <div id="payment-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="payment-modal-title">
                 <div class="modal-box">
                     <div class="modal-header">
-                        <h3>💳 진료 예약금 결제</h3>
-                        <button type="button" id="btn-close-payment" class="modal-close-btn">&times;</button>
+                        <h3 id="payment-modal-title">진료 예약금 결제</h3>
+                        <button type="button" id="btn-close-payment" class="modal-close-btn" aria-label="결제 모달 닫기">&times;</button>
                     </div>
                     <div class="modal-body">
                         <div class="payment-summary">
                             <div class="summary-row">
                                 <span class="summary-label">진료 예약금</span>
-                                <span class="summary-value" style="color: var(--primary-color); font-weight: 700;">10,000 원</span>
+                                <span class="summary-value amount" style="color: var(--primary);">10,000원</span>
                             </div>
                             <div class="summary-row">
                                 <span class="summary-label">의료진</span>
@@ -198,23 +226,23 @@
                                 <span id="payment-booking-datetime" class="summary-value">-</span>
                             </div>
                         </div>
-                        
+
                         <div class="payment-methods">
                             <h4>결제 수단 선택</h4>
-                            <div class="methods-grid">
+                            <div class="methods-grid" role="radiogroup" aria-label="결제 수단">
                                 <label class="method-item selected">
                                     <input type="radio" name="payment-method" value="CARD" checked>
-                                    <span class="method-icon">💳</span>
+                                    <span class="method-icon" aria-hidden="true">💳</span>
                                     <span class="method-name">신용/체크카드</span>
                                 </label>
                                 <label class="method-item">
                                     <input type="radio" name="payment-method" value="KAKAO">
-                                    <span class="method-icon">💛</span>
+                                    <span class="method-icon" aria-hidden="true">💛</span>
                                     <span class="method-name">카카오페이</span>
                                 </label>
                                 <label class="method-item">
                                     <input type="radio" name="payment-method" value="TOSS">
-                                    <span class="method-icon">💙</span>
+                                    <span class="method-icon" aria-hidden="true">💙</span>
                                     <span class="method-name">토스페이</span>
                                 </label>
                             </div>
@@ -227,8 +255,7 @@
             </div>
         </main>
     </div>
-    
-    <!-- JS 연결 -->
+
     <script src="/js/app.js"></script>
 </body>
 </html>

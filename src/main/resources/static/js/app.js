@@ -123,9 +123,9 @@ function setupEventListeners() {
         if (isLoginMode) {
             // 회원가입은 Keycloak 내장 회원가입 페이지로 이동
             window.location.href =
-                'http://keycloak.local/realms/hospital/protocol/openid-connect/registrations' +
+                'http://localhost:8080/realms/hospital/protocol/openid-connect/registrations' +
                 '?client_id=hospital-frontend&response_type=code' +
-                '&redirect_uri=http%3A%2F%2Flocalhost';
+                '&redirect_uri=http%3A%2F%2Flocalhost%3A8081%2F';
         } else {
             toggleAuthMode();
         }
@@ -345,9 +345,9 @@ async function handleAuthSubmit(e) {
             // 회원가입은 Keycloak 내장 회원가입 페이지를 통해 진행됩니다.
             // toggleAuthMode() 대신 Keycloak registration 페이지로 이동합니다.
             const keycloakRegistrationUrl =
-                'http://keycloak.local/realms/hospital/protocol/openid-connect/registrations' +
+                'http://localhost:8080/realms/hospital/protocol/openid-connect/registrations' +
                 '?client_id=hospital-frontend&response_type=code' +
-                '&redirect_uri=http%3A%2F%2Flocalhost';
+                '&redirect_uri=http%3A%2F%2Flocalhost%3A8081%2F';
             window.location.href = keycloakRegistrationUrl;
         }
     } catch (error) {
@@ -445,6 +445,19 @@ async function loadDoctors() {
 function renderDoctors() {
     DOM.doctorsList.innerHTML = '';
 
+    if (state.doctors.length === 0) {
+        DOM.doctorsList.innerHTML = `
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/>
+                    <path d="M16 3v4M8 3v4M12 12v4M10 14h4"/>
+                </svg>
+                <p>등록된 의료진이 없습니다.</p>
+            </div>
+        `;
+        return;
+    }
+
     state.doctors.forEach((doctor) => {
         const div = document.createElement('div');
         div.className = `list-item doctor-item ${!doctor.available ? 'disabled-area' : ''}`;
@@ -477,12 +490,8 @@ function selectDoctor(doctor, element) {
     state.selectedDoctor = doctor;
 
     DOM.selectedDoctorDisplay.innerHTML = `
-        <h4 style="color:var(--primary-dark); margin-bottom:0.2rem;">
-            선택된 의료진: ${escapeHtml(doctor.name)} (${escapeHtml(doctor.department)})
-        </h4>
-        <p style="font-size:0.9rem;">
-            ${escapeHtml(doctor.hospitalName || doctor.hospital_name)}
-        </p>
+        <h4>선택된 의료진: ${escapeHtml(doctor.name)} (${escapeHtml(doctor.department)})</h4>
+        <p>${escapeHtml(doctor.hospitalName || doctor.hospital_name)}</p>
     `;
 
     DOM.bookingInputs.classList.add('active');
@@ -645,9 +654,15 @@ function renderBookings() {
 
     if (state.reservations.length === 0) {
         DOM.bookingsList.innerHTML = `
-            <p class="placeholder-text" style="padding:2rem;">
-                예약 내역이 없습니다.
-            </p>
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+                    <rect x="9" y="3" width="6" height="4" rx="1"/>
+                    <line x1="9" y1="12" x2="15" y2="12"/>
+                    <line x1="9" y1="16" x2="13" y2="16"/>
+                </svg>
+                <p>예약 내역이 없습니다.</p>
+            </div>
         `;
         return;
     }
@@ -701,7 +716,7 @@ function renderBookings() {
                         : ''
                 }
 
-                <p style="font-size:0.8rem; color:var(--text-muted);">
+                <p class="booking-created-at">
                     신청일: ${reservation.createdAt || reservation.created_at
                         ? new Date(reservation.createdAt || reservation.created_at).toLocaleString()
                         : '-'}

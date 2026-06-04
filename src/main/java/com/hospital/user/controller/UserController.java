@@ -1,9 +1,9 @@
 package com.hospital.user.controller;
 
-import com.hospital.user.domain.User;
 import com.hospital.user.dto.UserResponse;
 import com.hospital.user.service.UserService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -14,8 +14,9 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/{id}")
-    public UserResponse getUser(@PathVariable Long id) {
-        User user = userService.getUser(id);
-        return new UserResponse(user.getId(), user.getName(), user.getEmail(), user.getRole());
+    public ResponseEntity<UserResponse> getUser(@PathVariable Long id) {
+        return userService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }
