@@ -1,8 +1,9 @@
 package com.hospital.user.controller;
 
-import com.hospital.user.domain.Doctor;
-import com.hospital.user.repository.DoctorRepository;
+import com.hospital.user.dto.DoctorResponse;
+import com.hospital.user.service.DoctorService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -12,20 +13,17 @@ import java.util.List;
 @RequestMapping("/api/doctors")
 public class DoctorController {
 
-    private final DoctorRepository doctorRepository;
+    private final DoctorService doctorService;
 
-    // 전체 의사 조회
     @GetMapping
-    public List<Doctor> getAllDoctors() {
-
-        return doctorRepository.findAll();
+    public List<DoctorResponse> getAllDoctors() {
+        return doctorService.findAll();
     }
 
-    // 의사 단건 조회
     @GetMapping("/{id}")
-    public Doctor getDoctor(@PathVariable Long id) {
-
-        return doctorRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("의사를 찾을 수 없습니다."));
+    public ResponseEntity<DoctorResponse> getDoctor(@PathVariable Long id) {
+        return doctorService.findById(id)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }
