@@ -327,12 +327,16 @@ async function handleAuthSubmit(e) {
 
             const data = await res.json();
 
-            // Keycloak access_token JWT payload에서 사용자 정보 추출
-            // (Keycloak 토큰에는 id/email/name/role 최상위 필드가 없으므로 디코드 필요)
+            // JWT payload에서 기본 정보 추출
             const claims = decodeJwt(data.access_token);
-            // NOTE: Keycloak sub(UUID)와 백엔드 patientId(Long) 식별자 매핑은 후속 과제
+
+            // /api/users/me 호출: sub(UUID)→DB 숫자 id 매핑 (JIT 자동 생성)
+            state.token = data.access_token;
+            const meRes = await apiFetch('/users/me');
+            const meData = meRes.ok ? await meRes.json() : null;
+
             saveAuth(data.access_token, {
-                id: claims.sub,
+                id: meData?.id ?? null,
                 email: claims.email,
                 name: claims.name || claims.preferred_username,
                 role: (claims.realm_access?.roles || [])[0]
