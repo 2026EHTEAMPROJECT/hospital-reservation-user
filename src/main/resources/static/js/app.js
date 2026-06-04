@@ -6,7 +6,7 @@
 // ===============================
 // ⚙️ 설정
 // ===============================
-const API_BASE_URL = 'http://localhost:8081/api';
+const API_BASE_URL = '/api';
 
 // ===============================
 // 🛡️ XSS 방지 헬퍼
@@ -125,7 +125,7 @@ function setupEventListeners() {
             window.location.href =
                 'http://localhost:8080/realms/hospital/protocol/openid-connect/registrations' +
                 '?client_id=hospital-frontend&response_type=code' +
-                '&redirect_uri=http%3A%2F%2Flocalhost%3A8081%2F';
+                '&redirect_uri=' + encodeURIComponent(window.location.origin + '/');
         } else {
             toggleAuthMode();
         }
@@ -347,7 +347,7 @@ async function handleAuthSubmit(e) {
             const keycloakRegistrationUrl =
                 'http://localhost:8080/realms/hospital/protocol/openid-connect/registrations' +
                 '?client_id=hospital-frontend&response_type=code' +
-                '&redirect_uri=http%3A%2F%2Flocalhost%3A8081%2F';
+                '&redirect_uri=' + encodeURIComponent(window.location.origin + '/');
             window.location.href = keycloakRegistrationUrl;
         }
     } catch (error) {
@@ -379,8 +379,9 @@ function connectNotification() {
         state.notificationSource.close();
     }
 
+    // EventSource는 Authorization 헤더 못 실어 인증 보호된 경로면 401 가능(알림은 best-effort)
     state.notificationSource = new EventSource(
-        `http://localhost:8084/notifications/stream?patientId=${state.user.id}`
+        `/notifications/stream?patientId=${state.user.id}`
     );
 
     state.notificationSource.addEventListener('connect', (event) => {
@@ -786,13 +787,13 @@ async function apiFetch(url, options = {}) {
 
     let baseUrl = API_BASE_URL;
 
-    // 예약 관련 API는 booking-service (8082)
+    // 예약 관련 API → 게이트웨이 /api/reservations
     if (url.startsWith('/reservations')) {
-        baseUrl = 'http://localhost:8082/api';
+        baseUrl = '/api';
     }
-    // 결제 관련 API는 payment-service (8083)
+    // 결제 관련 API → 게이트웨이 /payments (컨트롤러 경로 그대로)
     else if (url.startsWith('/payments')) {
-        baseUrl = 'http://localhost:8083/api';
+        baseUrl = '';
     }
 
     return fetch(`${baseUrl}${url}`, {
