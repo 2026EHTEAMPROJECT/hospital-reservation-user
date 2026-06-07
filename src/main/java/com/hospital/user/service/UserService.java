@@ -13,6 +13,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class UserService {
 
+    private static final String DEFAULT_ROLE = "PATIENT";
+
     private final UserRepository userRepository;
 
     public Optional<UserResponse> findById(Long id) {
@@ -29,7 +31,7 @@ public class UserService {
                             .keycloakId(keycloakId)
                             .email(email)
                             .name(name != null ? name : email)
-                            .role("PATIENT")
+                            .role(DEFAULT_ROLE)
                             .build();
                     User saved = userRepository.save(newUser);
                     return new UserResponse(saved.getId(), saved.getName(), saved.getEmail(), saved.getRole());
