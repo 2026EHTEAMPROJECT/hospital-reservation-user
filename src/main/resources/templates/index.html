@@ -16,6 +16,7 @@
                 </div>
                 <div class="nav-links">
                     <a href="#" id="nav-home" class="hidden" aria-label="홈으로 이동">홈</a>
+                    <a href="#" id="nav-notifications" class="hidden" aria-label="알림">알림</a>
                     <a href="#" id="nav-mypage" class="hidden" aria-label="마이페이지로 이동">마이페이지</a>
                     <a href="#" id="nav-logout" class="hidden btn-outline" aria-label="로그아웃">로그아웃</a>
                 </div>
@@ -146,8 +147,8 @@
             <!-- MyPage Section -->
             <section id="mypage-section" class="section-container hidden" aria-label="마이페이지">
                 <div class="dashboard-header">
-                    <h2>마이페이지</h2>
-                    <p>나의 프로필 정보와 예약 상태를 확인하고 관리할 수 있습니다.</p>
+                    <h2 id="mypage-title">마이페이지</h2>
+                    <p id="mypage-subtitle">나의 프로필 정보와 예약 상태를 확인하고 관리할 수 있습니다.</p>
                 </div>
 
                 <div class="dashboard-grid">
@@ -187,12 +188,35 @@
                                 <line x1="9" y1="12" x2="15" y2="12"/>
                                 <line x1="9" y1="16" x2="13" y2="16"/>
                             </svg>
-                            <h3>예약 내역</h3>
+                            <h3 id="bookings-card-title">예약 내역</h3>
                         </div>
                         <div class="card-body">
                             <div id="bookings-list" class="list-container" role="list" aria-label="예약 내역 목록">
                                 <!-- JS renders bookings here -->
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Notifications Section -->
+            <section id="notifications-section" class="section-container hidden" aria-label="알림">
+                <div class="dashboard-header">
+                    <h2>알림</h2>
+                    <p>예약 및 결제 관련 알림을 확인할 수 있습니다.</p>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--primary)" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+                            <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                        <h3>알림 목록</h3>
+                    </div>
+                    <div class="card-body">
+                        <div id="notifications-list" class="list-container" role="list" aria-label="알림 목록">
+                            <!-- JS renders notifications here -->
                         </div>
                     </div>
                 </div>
