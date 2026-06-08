@@ -35,6 +35,7 @@ const state = {
 const DOM = {
     // Nav
     navHome: document.getElementById('nav-home'),
+    navNotifications: document.getElementById('nav-notifications'),
     navMypage: document.getElementById('nav-mypage'),
     navLogout: document.getElementById('nav-logout'),
 
@@ -42,6 +43,8 @@ const DOM = {
     authSection: document.getElementById('auth-section'),
     dashboardSection: document.getElementById('dashboard-section'),
     mypageSection: document.getElementById('mypage-section'),
+    notificationsSection: document.getElementById('notifications-section'),
+    notificationsList: document.getElementById('notifications-list'),
 
     // Auth
     authTitle: document.getElementById('auth-title'),
@@ -107,6 +110,11 @@ function setupEventListeners() {
     DOM.navHome.addEventListener('click', (e) => {
         e.preventDefault();
         navigate('dashboard');
+    });
+
+    DOM.navNotifications.addEventListener('click', (e) => {
+        e.preventDefault();
+        navigate('notifications');
     });
 
     DOM.navMypage.addEventListener('click', (e) => {
@@ -199,13 +207,16 @@ function navigate(view) {
     DOM.authSection.classList.add('hidden');
     DOM.dashboardSection.classList.add('hidden');
     DOM.mypageSection.classList.add('hidden');
+    DOM.notificationsSection.classList.add('hidden');
 
     if (state.token) {
         DOM.navHome.classList.remove('hidden');
+        DOM.navNotifications.classList.remove('hidden');
         DOM.navMypage.classList.remove('hidden');
         DOM.navLogout.classList.remove('hidden');
     } else {
         DOM.navHome.classList.add('hidden');
+        DOM.navNotifications.classList.add('hidden');
         DOM.navMypage.classList.add('hidden');
         DOM.navLogout.classList.add('hidden');
     }
@@ -228,8 +239,14 @@ function navigate(view) {
 
         case 'mypage':
             DOM.mypageSection.classList.remove('hidden');
+            applyMypageRoleLabels();
             renderProfile();
             loadMyBookings();
+            break;
+
+        case 'notifications':
+            DOM.notificationsSection.classList.remove('hidden');
+            loadNotifications();
             break;
     }
 }
@@ -695,6 +712,27 @@ if (DOM.btnPaySubmit) {
 }
 
 // ===============================
+// 🏷️ MYPAGE ROLE LABELS (ADMIN vs 일반)
+// ===============================
+function applyMypageRoleLabels() {
+    const isAdmin = state.user?.role === 'ADMIN';
+
+    const titleEl = document.getElementById('mypage-title');
+    const subtitleEl = document.getElementById('mypage-subtitle');
+    const bookingsCardTitleEl = document.getElementById('bookings-card-title');
+
+    if (isAdmin) {
+        if (titleEl) titleEl.textContent = '예약 관리';
+        if (subtitleEl) subtitleEl.textContent = '전체 고객의 예약을 확인하고 승인 또는 거절할 수 있습니다.';
+        if (bookingsCardTitleEl) bookingsCardTitleEl.textContent = '예약 관리 (전체 고객)';
+    } else {
+        if (titleEl) titleEl.textContent = '마이페이지';
+        if (subtitleEl) subtitleEl.textContent = '나의 프로필 정보와 예약 상태를 확인하고 관리할 수 있습니다.';
+        if (bookingsCardTitleEl) bookingsCardTitleEl.textContent = '내 예약';
+    }
+}
+
+// ===============================
 // 👤 PROFILE
 // ===============================
 function renderProfile() {
@@ -792,7 +830,11 @@ function renderBookings() {
 
                 ${
                     isAdmin
-                        ? `<p>👤 신청환자: ${escapeHtml(reservation.patientName) || '환자 ID: ' + (reservation.patientId || reservation.patient_id)}</p>`
+                        ? `<p>👤 신청환자: ${
+                            reservation.patientName
+                                ? escapeHtml(reservation.patientName)
+                                : '환자 ID ' + escapeHtml(reservation.patientId || reservation.patient_id || '-')
+                          }</p>`
                         : ''
                 }
 
@@ -805,11 +847,11 @@ function renderBookings() {
                 ${
                     isAdmin
                         ? `
-                        <div style="margin-top:10px; display: flex; gap: 8px;">
+                        <div class="admin-actions">
                             ${reservation.status === 'WAITING' ? `
                                 <button class="btn btn-sm btn-primary" onclick="confirmReservation(${reservation.id})">승인</button>
                                 <button class="btn btn-sm btn-danger" onclick="cancelReservation(${reservation.id})">거절 (환불)</button>
-                            ` : ''}
+                            ` : '<span class="admin-actions-done">처리 완료</span>'}
                         </div>
                         `
                         : `
@@ -824,6 +866,81 @@ function renderBookings() {
         `;
 
         DOM.bookingsList.appendChild(div);
+    });
+}
+
+// ===============================
+// 🔔 LOAD NOTIFICATIONS
+// ===============================
+async function loadNotifications() {
+    if (!state.user?.id) {
+        renderNotifications([]);
+        return;
+    }
+
+    showLoader();
+
+    try {
+        const res = await apiFetch(`/notifications?patientId=${state.user.id}`);
+        if (!res.ok) {
+            throw new Error('알림을 불러오지 못했습니다.');
+        }
+        const data = await res.json();
+        renderNotifications(Array.isArray(data) ? data : []);
+    } catch (error) {
+        console.error(error);
+        renderNotifications([]);
+        showToast('알림을 불러오지 못했습니다.');
+    } finally {
+        hideLoader();
+    }
+}
+
+// ===============================
+// 🔔 RENDER NOTIFICATIONS
+// ===============================
+const NOTIFICATION_TYPE_MAP = {
+    'BOOKING':  { label: '예약',   icon: '📅', cls: 'BOOKING' },
+    'PAYMENT':  { label: '결제',   icon: '💳', cls: 'PAYMENT' },
+    'REFUND':   { label: '환불',   icon: '💰', cls: 'REFUND' },
+    'CANCEL':   { label: '취소',   icon: '🚫', cls: 'CANCEL' }
+};
+
+function renderNotifications(notifications) {
+    DOM.notificationsList.innerHTML = '';
+
+    if (!notifications || notifications.length === 0) {
+        DOM.notificationsList.innerHTML = `
+            <div class="empty-state">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                </svg>
+                <p>받은 알림이 없습니다.</p>
+            </div>
+        `;
+        return;
+    }
+
+    notifications.forEach((n) => {
+        const typeInfo = NOTIFICATION_TYPE_MAP[n.type] || { label: n.type || '알림', icon: '🔔', cls: '' };
+        const receivedAt = n.receivedAt
+            ? escapeHtml(new Date(n.receivedAt).toLocaleString('ko-KR'))
+            : '-';
+
+        const div = document.createElement('div');
+        div.className = 'list-item notification-item';
+        div.innerHTML = `
+            <div class="booking-header">
+                <strong><span class="notification-icon" aria-hidden="true">${typeInfo.icon}</span> ${escapeHtml(n.message)}</strong>
+                <span class="badge ${escapeHtml(typeInfo.cls)}" aria-label="알림 유형: ${escapeHtml(typeInfo.label)}">${escapeHtml(typeInfo.label)}</span>
+            </div>
+            <div class="booking-details">
+                <p class="notification-time">🕒 ${receivedAt}</p>
+            </div>
+        `;
+
+        DOM.notificationsList.appendChild(div);
     });
 }
 
@@ -872,6 +989,10 @@ async function apiFetch(url, options = {}) {
     }
     // 결제 관련 API → 게이트웨이 /payments (컨트롤러 경로 그대로)
     else if (url.startsWith('/payments')) {
+        baseUrl = '';
+    }
+    // 알림 관련 API → 게이트웨이 /notifications (SSE /notifications/stream과 동일 베이스)
+    else if (url.startsWith('/notifications')) {
         baseUrl = '';
     }
 

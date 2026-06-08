@@ -672,6 +672,56 @@ a { text-decoration: none; color: inherit; }
     border: 1px solid #a7f3d0;
 }
 
+/* Notification type badges */
+.badge.BOOKING {
+    background: var(--primary-light);
+    color: var(--primary-dark);
+    border: 1px solid var(--primary-mid);
+}
+
+.badge.PAYMENT {
+    background: #d1fae5;
+    color: #065f46;
+    border: 1px solid #a7f3d0;
+}
+
+.badge.REFUND {
+    background: #ede9fe;
+    color: #5b21b6;
+    border: 1px solid #ddd6fe;
+}
+
+.badge.CANCEL {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+}
+
+/* =========================================================
+   NOTIFICATION ITEMS
+   ========================================================= */
+.notification-item {
+    cursor: default;
+}
+
+.notification-item:hover {
+    transform: none;
+    box-shadow: var(--shadow-sm);
+}
+
+.notification-item .booking-header strong {
+    font-weight: 600;
+}
+
+.notification-icon {
+    margin-right: 0.15rem;
+}
+
+.notification-time {
+    font-size: 0.8rem !important;
+    color: var(--text-3) !important;
+}
+
 /* =========================================================
    EMPTY STATE
    ========================================================= */
@@ -696,6 +746,8 @@ a { text-decoration: none; color: inherit; }
 .empty-state p {
     font-size: 0.9rem;
     font-weight: 500;
+    line-height: 1.5;
+    max-width: 280px;
 }
 
 /* =========================================================
@@ -993,11 +1045,36 @@ a { text-decoration: none; color: inherit; }
     margin-top: 0.75rem;
     display: flex;
     gap: 0.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.admin-actions-done {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--text-3);
+}
+
+/* disabled state consistency for small/danger buttons */
+.btn:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+.btn-danger:disabled {
+    background: #fee2e2;
+    color: var(--status-canceled);
+    border-color: #fecaca;
 }
 
 @media (max-width: 480px) {
     .nav-links {
-        gap: 0.25rem;
+        gap: 0.2rem;
+    }
+
+    .nav-links a {
+        padding: 0.35rem 0.5rem;
+        font-size: 0.78rem;
     }
 
     .btn-outline {
