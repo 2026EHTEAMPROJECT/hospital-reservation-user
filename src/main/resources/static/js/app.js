@@ -122,11 +122,8 @@ function setupEventListeners() {
     DOM.toggleAuthBtn.addEventListener('click', (e) => {
         e.preventDefault();
         if (isLoginMode) {
-            // 회원가입은 Keycloak 내장 회원가입 페이지로 이동
-            window.location.href =
-                'http://localhost:8080/realms/hospital/protocol/openid-connect/registrations' +
-                '?client_id=hospital-frontend&response_type=code' +
-                '&redirect_uri=' + encodeURIComponent(window.location.origin + '/');
+            // 회원가입은 자체 회원가입 페이지로 이동 (login-service /api/register 호출)
+            window.location.href = '/register.html';
         } else {
             toggleAuthMode();
         }
@@ -347,13 +344,8 @@ async function handleAuthSubmit(e) {
             navigate('dashboard');
         } else {
             // ================= SIGNUP =================
-            // 회원가입은 Keycloak 내장 회원가입 페이지를 통해 진행됩니다.
-            // toggleAuthMode() 대신 Keycloak registration 페이지로 이동합니다.
-            const keycloakRegistrationUrl =
-                'http://localhost:8080/realms/hospital/protocol/openid-connect/registrations' +
-                '?client_id=hospital-frontend&response_type=code' +
-                '&redirect_uri=' + encodeURIComponent(window.location.origin + '/');
-            window.location.href = keycloakRegistrationUrl;
+            // 회원가입은 자체 register.html 폼(login-service /api/register)으로 진행됩니다.
+            window.location.href = '/register.html';
         }
     } catch (error) {
         console.error(error);

@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>회원가입 · MedicalCare+</title>
+    <style>
+        :root {
+            --blue: #1d72b8;
+            --blue-dark: #155a91;
+            --mint: #2bb8a3;
+            --bg: #eef5fb;
+            --text: #1f2d3d;
+            --muted: #6b7a8d;
+            --error: #d64545;
+            --success: #1f9d6b;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", "Apple SD Gothic Neo", sans-serif;
+            background: linear-gradient(135deg, var(--bg), #ffffff);
+            color: var(--text);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+        }
+        .panel {
+            width: 100%;
+            max-width: 420px;
+            background: #ffffff;
+            border-radius: 18px;
+            box-shadow: 0 18px 48px rgba(29, 114, 184, 0.15);
+            padding: 36px 32px;
+        }
+        .eyebrow {
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-size: 12px;
+            font-weight: 700;
+            color: var(--mint);
+        }
+        h1 { margin: 6px 0 8px; font-size: 28px; }
+        .desc { margin: 0 0 24px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+        label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+        .field { margin-bottom: 18px; }
+        input {
+            width: 100%;
+            padding: 12px 14px;
+            border: 1px solid #d4e2ee;
+            border-radius: 10px;
+            font-size: 15px;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+        input:focus {
+            outline: none;
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(29, 114, 184, 0.15);
+        }
+        button {
+            width: 100%;
+            padding: 13px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--blue), var(--blue-dark));
+            color: #fff;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        button:disabled { opacity: 0.6; cursor: not-allowed; }
+        .message { margin: 16px 0 0; font-size: 14px; min-height: 20px; }
+        .message.error { color: var(--error); }
+        .message.success { color: var(--success); }
+        .foot { margin-top: 20px; text-align: center; font-size: 14px; color: var(--muted); }
+        .foot a { color: var(--blue); font-weight: 600; text-decoration: none; }
+        .foot a:hover { text-decoration: underline; }
+    </style>
+</head>
+<body>
+<section class="panel" aria-label="회원가입 폼">
+    <p class="eyebrow">Account Setup</p>
+    <h1>회원가입</h1>
+    <p class="desc">이메일·비밀번호·이름을 입력하면 인증 서버(Keycloak)에 계정이 등록됩니다.</p>
+
+    <form id="registerForm">
+        <div class="field">
+            <label for="email">이메일</label>
+            <input id="email" name="email" type="email" required maxlength="100" autocomplete="email" placeholder="예: hong@example.com">
+        </div>
+        <div class="field">
+            <label for="name">이름</label>
+            <input id="name" name="name" type="text" required maxlength="50" autocomplete="name" placeholder="예: 홍길동">
+        </div>
+        <div class="field">
+            <label for="password">비밀번호</label>
+            <input id="password" name="password" type="password" required minlength="8" maxlength="200" autocomplete="new-password" placeholder="8자 이상">
+        </div>
+        <button id="submitButton" type="submit">회원가입</button>
+    </form>
+
+    <p id="message" class="message" role="status" aria-live="polite"></p>
+
+    <p class="foot">이미 계정이 있으신가요? <a href="/">로그인하기</a></p>
+</section>
+
+<script>
+    const form = document.getElementById('registerForm');
+    const submitButton = document.getElementById('submitButton');
+    const message = document.getElementById('message');
+
+    function showMessage(text, type) {
+        message.textContent = text;
+        message.className = 'message ' + (type || '');
+    }
+
+    const ERROR_MAP = {
+        user_already_exists: '이미 가입된 이메일입니다.',
+        auth_server_error: '인증 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
+    };
+
+    form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const email = document.getElementById('email').value.trim();
+        const name = document.getElementById('name').value.trim();
+        const password = document.getElementById('password').value;
+
+        if (!email || !name || !password) {
+            showMessage('모든 항목을 입력해 주세요.', 'error');
+            return;
+        }
+        if (password.length < 8) {
+            showMessage('비밀번호는 8자 이상이어야 합니다.', 'error');
+            return;
+        }
+
+        submitButton.disabled = true;
+        showMessage('회원가입 처리 중입니다...', '');
+
+        try {
+            const response = await fetch('/api/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, name })
+            });
+
+            let payload = null;
+            const contentType = response.headers.get('content-type') || '';
+            payload = contentType.includes('application/json') ? await response.json() : await response.text();
+
+            if (response.ok) {
+                showMessage('회원가입이 완료되었습니다! 잠시 후 로그인 화면으로 이동합니다.', 'success');
+                form.reset();
+                setTimeout(() => { window.location.href = '/'; }, 1800);
+            } else {
+                const code = payload && payload.error ? payload.error : '';
+                showMessage('회원가입 실패: ' + (ERROR_MAP[code] || code || '알 수 없는 오류'), 'error');
+            }
+        } catch (error) {
+            showMessage('요청 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.', 'error');
+        } finally {
+            submitButton.disabled = false;
+        }
+    });
+</script>
+</body>
+</html>
