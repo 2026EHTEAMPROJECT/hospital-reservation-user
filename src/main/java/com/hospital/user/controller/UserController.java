@@ -20,9 +20,19 @@ public class UserController {
     public ResponseEntity<UserResponse> getMe(@AuthenticationPrincipal Jwt jwt) {
         String keycloakId = jwt.getSubject();
         String email = jwt.getClaimAsString("email");
-        String name = jwt.getClaimAsString("name");
-        if (name == null) name = jwt.getClaimAsString("preferred_username");
-        return ResponseEntity.ok(userService.getOrCreateByKeycloakId(keycloakId, email, name));
+        // 한국식 성+이름(family_name + given_name) 으로 표시 이름을 만든다.
+        // 클레임이 없으면 name → preferred_username 순으로 graceful fallback.
+        String family = jwt.getClaimAsString("family_name");
+        String given = jwt.getClaimAsString("given_name");
+        String name;
+        if ((family != null && !family.isBlank()) || (given != null && !given.isBlank())) {
+            name = ((family == null ? "" : family) + (given == null ? "" : given)).trim();
+        } else {
+            name = jwt.getClaimAsString("name");
+            if (name == null) name = jwt.getClaimAsString("preferred_username");
+        }
+        String phoneNumber = jwt.getClaimAsString("phoneNumber");
+        return ResponseEntity.ok(userService.syncFromKeycloak(keycloakId, email, name, phoneNumber));
     }
 
     @PutMapping("/me")
