@@ -71,6 +71,14 @@ const DOM = {
     profilePhone: document.getElementById('profile-phone'),
     bookingsList: document.getElementById('bookings-list'),
 
+    // MyPage - 프로필 수정
+    profileView: document.getElementById('profile-view'),
+    profileEditForm: document.getElementById('profile-edit-form'),
+    editName: document.getElementById('edit-name'),
+    editPhone: document.getElementById('edit-phone'),
+    btnEditProfile: document.getElementById('btn-edit-profile'),
+    btnCancelEdit: document.getElementById('btn-cancel-edit'),
+
     // Payment Modal DOM
     paymentModal: document.getElementById('payment-modal'),
     paymentDoctorName: document.getElementById('payment-doctor-name'),
@@ -93,6 +101,23 @@ function decodeJwt(t) {
     } catch (e) {
         return {};
     }
+}
+
+// ===============================
+// 🧑 한국식 표시 이름 조합
+// ===============================
+// JWT 클레임에서 성(family_name/lastName)과 이름(given_name/firstName)을 조합해
+// 한국식 "성+이름"(예: 김민준)으로 만든다. 클레임이 없으면 name/preferred_username으로
+// graceful fallback 한다.
+function buildDisplayName(claims) {
+    if (!claims) return '';
+    const lastName = claims.family_name || claims.lastName || '';
+    const firstName = claims.given_name || claims.firstName || '';
+    const combined = `${lastName}${firstName}`.trim();
+    if (combined) {
+        return combined;
+    }
+    return claims.name || claims.preferred_username || '';
 }
 
 // ===============================
@@ -151,6 +176,28 @@ function setupEventListeners() {
     const phoneInput = document.getElementById('phone');
     if (phoneInput) {
         phoneInput.addEventListener('input', (e) => {
+            e.target.value = formatPhoneNumber(e.target.value);
+        });
+    }
+
+    // 마이페이지 프로필 수정
+    if (DOM.btnEditProfile) {
+        DOM.btnEditProfile.addEventListener('click', (e) => {
+            e.preventDefault();
+            enterProfileEdit();
+        });
+    }
+    if (DOM.btnCancelEdit) {
+        DOM.btnCancelEdit.addEventListener('click', (e) => {
+            e.preventDefault();
+            cancelProfileEdit();
+        });
+    }
+    if (DOM.profileEditForm) {
+        DOM.profileEditForm.addEventListener('submit', handleProfileUpdate);
+    }
+    if (DOM.editPhone) {
+        DOM.editPhone.addEventListener('input', (e) => {
             e.target.value = formatPhoneNumber(e.target.value);
         });
     }
@@ -237,6 +284,7 @@ function navigate(view) {
         case 'mypage':
             DOM.mypageSection.classList.remove('hidden');
             applyMypageRoleLabels();
+            cancelProfileEdit();
             renderProfile();
             loadMyBookings();
             break;
@@ -352,7 +400,10 @@ async function handleAuthSubmit(e) {
             saveAuth(data.access_token, {
                 id: meData?.id ?? null,
                 email: claims.email,
-                name: claims.name || claims.preferred_username,
+                // 한국식 성+이름으로 표시. JWT의 family_name/given_name 조합을 우선 사용하고,
+                // 클레임이 없으면 DB에 저장된 이름(meData.name) → name/preferred_username 순으로 fallback.
+                name: buildDisplayName(claims) || meData?.name || '',
+                phoneNumber: meData?.phoneNumber ?? '',
                 role: (claims.realm_access?.roles || [])[0]
             });
 
@@ -730,6 +781,68 @@ function applyMypageRoleLabels() {
 function renderProfile() {
     DOM.profileName.textContent = state.user.name || '-';
     DOM.profileEmail.textContent = state.user.email || '-';
+    if (DOM.profilePhone) {
+        DOM.profilePhone.textContent = state.user.phoneNumber || '-';
+    }
+}
+
+// ===============================
+// ✏️ PROFILE EDIT (마이페이지 이름·전화번호 수정)
+// ===============================
+function enterProfileEdit() {
+    if (DOM.profileView) DOM.profileView.classList.add('hidden');
+    if (DOM.profileEditForm) DOM.profileEditForm.classList.remove('hidden');
+
+    if (DOM.editName) DOM.editName.value = state.user.name || '';
+    if (DOM.editPhone) DOM.editPhone.value = state.user.phoneNumber || '';
+}
+
+function cancelProfileEdit() {
+    if (DOM.profileEditForm) DOM.profileEditForm.classList.add('hidden');
+    if (DOM.profileView) DOM.profileView.classList.remove('hidden');
+}
+
+async function handleProfileUpdate(e) {
+    e.preventDefault();
+
+    const name = DOM.editName ? DOM.editName.value.trim() : '';
+    const phoneNumber = DOM.editPhone ? DOM.editPhone.value.trim() : '';
+
+    if (name.length < 2) {
+        showToast('이름은 2자 이상 입력해주세요.');
+        return;
+    }
+    if (phoneNumber && !/^010-\d{4}-\d{4}$/.test(phoneNumber)) {
+        showToast('전화번호는 010-0000-0000 형식으로 입력해주세요.');
+        return;
+    }
+
+    showLoader();
+    try {
+        const res = await apiFetch('/users/me', {
+            method: 'PUT',
+            body: JSON.stringify({ name, phoneNumber })
+        });
+
+        if (!res.ok) {
+            throw new Error('프로필 수정에 실패했습니다.');
+        }
+
+        const updated = await res.json();
+
+        // 로컬 상태/스토리지 갱신
+        state.user.name = updated.name ?? name;
+        state.user.phoneNumber = updated.phoneNumber ?? phoneNumber;
+        saveAuth(state.token, state.user);
+
+        cancelProfileEdit();
+        renderProfile();
+        showToast('프로필이 수정되었습니다.');
+    } catch (error) {
+        showToast(error.message);
+    } finally {
+        hideLoader();
+    }
 }
 
 // ===============================

@@ -8,4 +8,6 @@ import java.util.List;
 public interface DoctorScheduleRepository extends JpaRepository<DoctorSchedule, Long> {
 
     List<DoctorSchedule> findByDoctorIdAndReservedFalseOrderByDateAscStartTimeAsc(Long doctorId);
+
+    boolean existsByDoctorId(Long doctorId);
 }

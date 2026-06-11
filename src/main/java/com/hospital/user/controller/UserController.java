@@ -1,6 +1,7 @@
 package com.hospital.user.controller;
 
 import com.hospital.user.dto.UserResponse;
+import com.hospital.user.dto.UserUpdateRequest;
 import com.hospital.user.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,6 +23,15 @@ public class UserController {
         String name = jwt.getClaimAsString("name");
         if (name == null) name = jwt.getClaimAsString("preferred_username");
         return ResponseEntity.ok(userService.getOrCreateByKeycloakId(keycloakId, email, name));
+    }
+
+    @PutMapping("/me")
+    public ResponseEntity<UserResponse> updateMe(@AuthenticationPrincipal Jwt jwt,
+                                                 @RequestBody UserUpdateRequest request) {
+        String keycloakId = jwt.getSubject();
+        return userService.updateProfileByKeycloakId(keycloakId, request)
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/{id}")

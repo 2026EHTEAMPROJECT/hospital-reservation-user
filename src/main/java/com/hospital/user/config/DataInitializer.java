@@ -26,43 +26,57 @@ public class DataInitializer implements CommandLineRunner {
             LocalTime.of(14, 0),
             LocalTime.of(15, 0));
 
+    // 시드 대상 의사 명단(기존 3명 + 신규 5명 = 총 8명).
+    // 이름 기준 멱등 추가이므로, 이미 존재하는 의사는 건너뛰고 없는 의사만 추가한다.
+    private static final List<Doctor> SEED_DOCTORS = List.of(
+            seedDoctor("김민준", "내과", "서울중앙병원"),
+            seedDoctor("이서연", "정형외과", "서울중앙병원"),
+            seedDoctor("박지훈", "피부과", "부산메디컬"),
+            seedDoctor("정수빈", "이비인후과", "서울중앙병원"),
+            seedDoctor("최예준", "안과", "부산메디컬"),
+            seedDoctor("한지우", "소아청소년과", "대구열린병원"),
+            seedDoctor("윤도현", "신경외과", "인천스마트병원"),
+            seedDoctor("강하은", "치과", "대구열린병원"));
+
+    private static Doctor seedDoctor(String name, String department, String hospitalName) {
+        return Doctor.builder()
+                .name(name)
+                .department(department)
+                .hospitalName(hospitalName)
+                .available(true)
+                .build();
+    }
+
     @Override
     public void run(String... args) {
-        if (doctorRepository.count() == 0) {
-            doctorRepository.save(Doctor.builder()
-                    .name("김민준")
-                    .department("내과")
-                    .hospitalName("서울중앙병원")
-                    .available(true)
-                    .build());
-            doctorRepository.save(Doctor.builder()
-                    .name("이서연")
-                    .department("정형외과")
-                    .hospitalName("서울중앙병원")
-                    .available(true)
-                    .build());
-            doctorRepository.save(Doctor.builder()
-                    .name("박지훈")
-                    .department("피부과")
-                    .hospitalName("부산메디컬")
-                    .available(true)
-                    .build());
+        // 1) 의사 멱등 추가: 이름이 없는 경우에만 저장
+        for (Doctor seed : SEED_DOCTORS) {
+            if (!doctorRepository.existsByName(seed.getName())) {
+                doctorRepository.save(Doctor.builder()
+                        .name(seed.getName())
+                        .department(seed.getDepartment())
+                        .hospitalName(seed.getHospitalName())
+                        .available(seed.isAvailable())
+                        .build());
+            }
         }
 
-        if (doctorScheduleRepository.count() == 0) {
-            LocalDate today = LocalDate.now();
-            for (Doctor doctor : doctorRepository.findAll()) {
-                for (int dayOffset = 1; dayOffset <= 3; dayOffset++) {
-                    LocalDate date = today.plusDays(dayOffset);
-                    for (LocalTime slot : TIME_SLOTS) {
-                        doctorScheduleRepository.save(DoctorSchedule.builder()
-                                .doctorId(doctor.getId())
-                                .date(date)
-                                .startTime(slot)
-                                .endTime(slot.plusHours(1))
-                                .reserved(false)
-                                .build());
-                    }
+        // 2) 스케줄 시드: 스케줄이 아직 없는 의사에 대해서만 생성(신규 추가 의사 포함)
+        LocalDate today = LocalDate.now();
+        for (Doctor doctor : doctorRepository.findAll()) {
+            if (doctorScheduleRepository.existsByDoctorId(doctor.getId())) {
+                continue;
+            }
+            for (int dayOffset = 1; dayOffset <= 3; dayOffset++) {
+                LocalDate date = today.plusDays(dayOffset);
+                for (LocalTime slot : TIME_SLOTS) {
+                    doctorScheduleRepository.save(DoctorSchedule.builder()
+                            .doctorId(doctor.getId())
+                            .date(date)
+                            .startTime(slot)
+                            .endTime(slot.plusHours(1))
+                            .reserved(false)
+                            .build());
                 }
             }
         }
