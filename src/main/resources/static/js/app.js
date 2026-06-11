@@ -444,10 +444,11 @@ function connectNotification() {
         state.notificationSource.close();
     }
 
-    // EventSource는 Authorization 헤더 못 실어 인증 보호된 경로면 401 가능(알림은 best-effort)
-    state.notificationSource = new EventSource(
-        `/notifications/stream?patientId=${state.user.id}`
-    );
+    // EventSource는 Authorization 헤더를 못 실으므로, JWT 를 access_token 쿼리파라미터로 전달한다.
+    // Istio(RequestAuthentication)와 notification-service(Spring Security) 모두 이 파라미터로 토큰을 검증한다.
+    const streamUrl = `/notifications/stream?patientId=${state.user.id}`
+        + (state.token ? `&access_token=${encodeURIComponent(state.token)}` : '');
+    state.notificationSource = new EventSource(streamUrl);
 
     state.notificationSource.addEventListener('connect', (event) => {
         console.log('SSE 연결 성공', event.data);
