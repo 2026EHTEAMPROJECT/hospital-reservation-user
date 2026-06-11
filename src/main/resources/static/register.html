@@ -47,6 +47,8 @@
         .desc { margin: 0 0 24px; color: var(--muted); font-size: 14px; line-height: 1.5; }
         label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
         .field { margin-bottom: 18px; }
+        .name-row { display: flex; gap: 12px; }
+        .name-row > div { flex: 1; }
         input {
             width: 100%;
             padding: 12px 14px;
@@ -85,16 +87,26 @@
 <section class="panel" aria-label="회원가입 폼">
     <p class="eyebrow">Account Setup</p>
     <h1>회원가입</h1>
-    <p class="desc">이메일·비밀번호·이름을 입력하면 인증 서버(Keycloak)에 계정이 등록됩니다.</p>
+    <p class="desc">이메일·비밀번호·이름·전화번호를 입력하면 인증 서버(Keycloak)에 계정이 등록됩니다.</p>
 
     <form id="registerForm">
         <div class="field">
             <label for="email">이메일</label>
             <input id="email" name="email" type="email" required maxlength="100" autocomplete="email" placeholder="예: hong@example.com">
         </div>
+        <div class="field name-row">
+            <div>
+                <label for="lastName">성</label>
+                <input id="lastName" name="lastName" type="text" required maxlength="25" autocomplete="family-name" placeholder="예: 홍">
+            </div>
+            <div>
+                <label for="firstName">이름</label>
+                <input id="firstName" name="firstName" type="text" required maxlength="25" autocomplete="given-name" placeholder="예: 길동">
+            </div>
+        </div>
         <div class="field">
-            <label for="name">이름</label>
-            <input id="name" name="name" type="text" required maxlength="50" autocomplete="name" placeholder="예: 홍길동">
+            <label for="phoneNumber">전화번호</label>
+            <input id="phoneNumber" name="phoneNumber" type="tel" required maxlength="13" autocomplete="tel" inputmode="numeric" placeholder="010-0000-0000">
         </div>
         <div class="field">
             <label for="password">비밀번호</label>
@@ -123,19 +135,44 @@
         auth_server_error: '인증 서버 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.'
     };
 
+    // 전화번호 자동 하이픈 (app.js formatPhoneNumber와 동일 규칙)
+    function formatPhoneNumber(value) {
+        value = value.replace(/[^0-9]/g, '');
+        if (value.length < 4) {
+            return value;
+        }
+        if (value.length < 8) {
+            return `${value.slice(0, 3)}-${value.slice(3)}`;
+        }
+        return `${value.slice(0, 3)}-${value.slice(3, 7)}-${value.slice(7, 11)}`;
+    }
+
+    const phoneInput = document.getElementById('phoneNumber');
+    phoneInput.addEventListener('input', (event) => {
+        event.target.value = formatPhoneNumber(event.target.value);
+    });
+
+    const PHONE_REGEX = /^010-\d{4}-\d{4}$/;
+
     form.addEventListener('submit', async (event) => {
         event.preventDefault();
 
         const email = document.getElementById('email').value.trim();
-        const name = document.getElementById('name').value.trim();
+        const lastName = document.getElementById('lastName').value.trim();
+        const firstName = document.getElementById('firstName').value.trim();
+        const phoneNumber = document.getElementById('phoneNumber').value.trim();
         const password = document.getElementById('password').value;
 
-        if (!email || !name || !password) {
+        if (!email || !lastName || !firstName || !phoneNumber || !password) {
             showMessage('모든 항목을 입력해 주세요.', 'error');
             return;
         }
         if (password.length < 8) {
             showMessage('비밀번호는 8자 이상이어야 합니다.', 'error');
+            return;
+        }
+        if (!PHONE_REGEX.test(phoneNumber)) {
+            showMessage('전화번호는 010-0000-0000 형식으로 입력해 주세요.', 'error');
             return;
         }
 
@@ -146,7 +183,7 @@
             const response = await fetch('/api/register', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, password, name })
+                body: JSON.stringify({ email, password, lastName, firstName, phoneNumber })
             });
 
             let payload = null;
