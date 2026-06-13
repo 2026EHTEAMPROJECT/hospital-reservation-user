@@ -818,10 +818,10 @@ async function handleProfileUpdate(e) {
             body: JSON.stringify({ name, phoneNumber })
         });
 
-        // 토큰 만료/무효 시에만 재로그인을 안내한다(평상시 정상 수정은 그대로 반영).
+        // 토큰 만료/무효(401/403) 여도 절대 자동 로그아웃하지 않는다(수정 중 갑자기 튕기지 않게).
+        // 안내만 하고 입력 폼은 유지해, 사용자가 우측 상단에서 다시 로그인 후 재시도할 수 있게 한다.
         if (res.status === 401 || res.status === 403) {
-            showToast('세션이 만료되었습니다. 다시 로그인 후 시도해주세요.');
-            logout();
+            showToast('세션이 만료되었습니다. 우측 상단에서 다시 로그인한 뒤 시도해주세요.');
             return;
         }
         if (!res.ok) {
@@ -908,6 +908,14 @@ function renderBookings() {
         const tabsEl = document.getElementById('admin-booking-tabs');
         if (tabsEl) tabsEl.classList.add('hidden');
     }
+
+    // 최신 신청건이 가장 위로 오도록 createdAt 내림차순 정렬(없으면 id 내림차순).
+    list = [...list].sort((a, b) => {
+        const ca = a.createdAt || a.created_at;
+        const cb = b.createdAt || b.created_at;
+        if (ca && cb) return new Date(cb).getTime() - new Date(ca).getTime();
+        return (b.id || 0) - (a.id || 0);
+    });
 
     if (list.length === 0) {
         DOM.bookingsList.innerHTML = `
