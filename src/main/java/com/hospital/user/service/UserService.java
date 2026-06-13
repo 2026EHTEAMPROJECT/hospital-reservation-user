@@ -23,30 +23,37 @@ public class UserService {
     }
 
     /**
-     * JWT(Keycloak) 클레임으로 로컬 사용자 레코드를 동기화한다. 없으면 생성, 있으면 최신화.
-     * - 이름: Keycloak 을 권위 소스로 항상 갱신한다. 과거 버전이 잘못 저장한 값(예: HTTP 헤더
-     *   인코딩으로 깨진 모지바케)도 다음 조회 때 자동으로 치유된다.
-     * - 전화번호: 로컬에 값이 없을 때만 클레임으로 초기 채운다(마이페이지 '정보 수정' 값 보존).
+     * JWT(Keycloak) 클레임으로 로컬 사용자 레코드를 동기화한다. 없으면 생성, 있으면 보존.
+     * - 이름·전화번호: 신규 생성 시에만 Keycloak 값으로 초기화한다. 기존 사용자는 마이페이지
+     *   '정보 수정'으로 바꾼 값을 보존한다(매 조회마다 Keycloak 값으로 덮어쓰면 편집이 사라짐).
      */
     @Transactional
     public UserResponse syncFromKeycloak(String keycloakId, String email, String name, String phoneNumber) {
-        User user = userRepository.findByKeycloakId(keycloakId)
-                .orElseGet(() -> User.builder()
-                        .keycloakId(keycloakId)
-                        .role(DEFAULT_ROLE)
-                        .build());
+        User existing = userRepository.findByKeycloakId(keycloakId).orElse(null);
+        boolean isNew = (existing == null);
+        User user = isNew
+                ? User.builder().keycloakId(keycloakId).role(DEFAULT_ROLE).build()
+                : existing;
 
         if (email != null && !email.isBlank()) {
             user.setEmail(email);
         }
-        if (name != null && !name.isBlank()) {
-            user.setName(name);
-        } else if (user.getName() == null) {
-            user.setName(email);
-        }
-        if ((user.getPhoneNumber() == null || user.getPhoneNumber().isBlank())
-                && phoneNumber != null && !phoneNumber.isBlank()) {
-            user.setPhoneNumber(phoneNumber);
+        if (isNew) {
+            // 신규 사용자만 Keycloak 의 이름/전화번호로 초기화한다.
+            user.setName((name != null && !name.isBlank()) ? name : email);
+            if (phoneNumber != null && !phoneNumber.isBlank()) {
+                user.setPhoneNumber(phoneNumber);
+            }
+        } else {
+            // 기존 사용자: 로컬 값이 비어 있을 때만 클레임으로 보강(편집값은 보존).
+            if ((user.getName() == null || user.getName().isBlank())
+                    && name != null && !name.isBlank()) {
+                user.setName(name);
+            }
+            if ((user.getPhoneNumber() == null || user.getPhoneNumber().isBlank())
+                    && phoneNumber != null && !phoneNumber.isBlank()) {
+                user.setPhoneNumber(phoneNumber);
+            }
         }
 
         return toResponse(userRepository.save(user));
