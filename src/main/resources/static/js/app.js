@@ -97,7 +97,14 @@ let isLoginMode = true;
 // ===============================
 function decodeJwt(t) {
     try {
-        return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const base64 = t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        // atob 는 base64 를 "바이트 단위(Latin-1)" 문자열로 돌려준다. 한글 같은 UTF-8
+        // 멀티바이트 클레임(family_name/given_name)을 그대로 JSON.parse 하면 깨지므로,
+        // 바이트로 되돌린 뒤 UTF-8 로 정확히 디코딩한다.
+        const binary = atob(base64);
+        const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
+        const json = new TextDecoder('utf-8').decode(bytes);
+        return JSON.parse(json);
     } catch (e) {
         return {};
     }
