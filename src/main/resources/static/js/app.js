@@ -26,7 +26,8 @@ const state = {
     reservations: [],
     selectedDoctor: null,
     availableSlots: [],
-    notificationSource: null
+    notificationSource: null,
+    adminBookingTab: 'pending'   // 어드민 예약 탭: 'pending'(미처리) | 'done'(처리됨)
 };
 
 // ===============================
@@ -817,6 +818,12 @@ async function handleProfileUpdate(e) {
             body: JSON.stringify({ name, phoneNumber })
         });
 
+        // 토큰 만료/무효 시에만 재로그인을 안내한다(평상시 정상 수정은 그대로 반영).
+        if (res.status === 401 || res.status === 403) {
+            showToast('세션이 만료되었습니다. 다시 로그인 후 시도해주세요.');
+            logout();
+            return;
+        }
         if (!res.ok) {
             throw new Error('프로필 수정에 실패했습니다.');
         }
@@ -865,10 +872,44 @@ async function loadMyBookings() {
 // ===============================
 // 📋 RENDER BOOKINGS
 // ===============================
+// 어드민 예약 카드 상단의 탭(미처리/처리됨)을 렌더하고 클릭 시 목록을 다시 그린다.
+function renderAdminBookingTabs() {
+    const tabsEl = document.getElementById('admin-booking-tabs');
+    if (!tabsEl) return;
+    const tab = state.adminBookingTab || 'pending';
+    tabsEl.classList.remove('hidden');
+    tabsEl.innerHTML = `
+        <button type="button" class="tab-btn ${tab === 'pending' ? 'active' : ''}" data-tab="pending">예약 관리 (전체 고객)</button>
+        <button type="button" class="tab-btn ${tab === 'done' ? 'active' : ''}" data-tab="done">처리됨</button>
+    `;
+    tabsEl.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            state.adminBookingTab = btn.dataset.tab;
+            renderBookings();
+        });
+    });
+}
+
 function renderBookings() {
     DOM.bookingsList.innerHTML = '';
 
-    if (state.reservations.length === 0) {
+    const isAdminView = state.user?.role === 'ADMIN';
+
+    // 어드민은 "예약 관리(전체 고객)"=미처리(WAITING)만, "처리됨"=그 외 상태로 탭 분리한다.
+    let list = state.reservations;
+    if (isAdminView) {
+        renderAdminBookingTabs();
+        if (state.adminBookingTab === 'done') {
+            list = state.reservations.filter(r => r.status !== 'WAITING');
+        } else {
+            list = state.reservations.filter(r => r.status === 'WAITING');
+        }
+    } else {
+        const tabsEl = document.getElementById('admin-booking-tabs');
+        if (tabsEl) tabsEl.classList.add('hidden');
+    }
+
+    if (list.length === 0) {
         DOM.bookingsList.innerHTML = `
             <div class="empty-state">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -877,13 +918,13 @@ function renderBookings() {
                     <line x1="9" y1="12" x2="15" y2="12"/>
                     <line x1="9" y1="16" x2="13" y2="16"/>
                 </svg>
-                <p>예약 내역이 없습니다.</p>
+                <p>${isAdminView && state.adminBookingTab === 'done' ? '처리된 예약이 없습니다.' : isAdminView ? '대기 중인 예약이 없습니다.' : '예약 내역이 없습니다.'}</p>
             </div>
         `;
         return;
     }
 
-    state.reservations.forEach(reservation => {
+    list.forEach(reservation => {
         const doctor = state.doctors.find(
             d => d.id === reservation.doctorId || d.id === reservation.doctor_id
         );
@@ -916,7 +957,15 @@ function renderBookings() {
         div.innerHTML = `
             <div class="booking-header">
                 <strong>${escapeHtml(department)} - ${escapeHtml(doctorName)} 전문의</strong>
-                <span class="badge ${escapeHtml(statusInfo.cls)}" aria-label="예약 상태: ${escapeHtml(statusInfo.label)}">${escapeHtml(statusInfo.label)}</span>
+                ${
+                    reservation.selfCanceled
+                        // 어드민 확정(CONFIRMED) 후 고객이 본인 취소한 건: "확정됨 + 자체취소" 표시.
+                        ? `<span class="badge-group">
+                               <span class="badge CONFIRMED" aria-label="예약 상태: 확정됨">확정됨</span>
+                               <span class="badge SELF_CANCEL" aria-label="자체취소됨">자체취소</span>
+                           </span>`
+                        : `<span class="badge ${escapeHtml(statusInfo.cls)}" aria-label="예약 상태: ${escapeHtml(statusInfo.label)}">${escapeHtml(statusInfo.label)}</span>`
+                }
             </div>
 
             <div class="booking-details">
@@ -1008,6 +1057,13 @@ const NOTIFICATION_TYPE_MAP = {
 
 function renderNotifications(notifications) {
     DOM.notificationsList.innerHTML = '';
+
+    // 최신 알림이 가장 위로 오도록 receivedAt 내림차순 정렬(값이 없으면 뒤로).
+    notifications = [...(notifications || [])].sort((a, b) => {
+        const ta = a.receivedAt ? new Date(a.receivedAt).getTime() : 0;
+        const tb = b.receivedAt ? new Date(b.receivedAt).getTime() : 0;
+        return tb - ta;
+    });
 
     if (!notifications || notifications.length === 0) {
         DOM.notificationsList.innerHTML = `
