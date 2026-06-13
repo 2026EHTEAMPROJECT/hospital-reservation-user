@@ -292,7 +292,8 @@ function navigate(view) {
             DOM.mypageSection.classList.remove('hidden');
             applyMypageRoleLabels();
             cancelProfileEdit();
-            renderProfile();
+            renderProfile();      // 기존 값으로 즉시 렌더
+            refreshProfile();     // /me 재조회 후 최신 이름·전화번호로 갱신
             loadMyBookings();
             break;
 
@@ -596,6 +597,9 @@ async function selectDoctor(doctor, element) {
         DOM.bookingTime.appendChild(opt);
     }
 
+    // 날짜·시간 입력 모두 활성화한다. resetBookingForm 이 disabled=true 로 막아두므로
+    // 의사 선택 시 반드시 풀어줘야 날짜 달력을 클릭할 수 있다(과거엔 bookingDate 가 비활성으로 남았음).
+    DOM.bookingDate.disabled = false;
     DOM.bookingTime.disabled = false;
     DOM.symptoms.disabled = false;
     DOM.btnBook.disabled = false;
@@ -754,6 +758,24 @@ function renderProfile() {
     DOM.profileEmail.textContent = state.user.email || '-';
     if (DOM.profilePhone) {
         DOM.profilePhone.textContent = state.user.phoneNumber || '-';
+    }
+}
+
+// 마이페이지 진입 시 /me 를 다시 불러 state.user 를 최신화한다. 로그인 시점의 스냅샷만
+// 쓰면 회원가입 직후 전화번호나 다른 기기에서의 수정이 반영되지 않는다.
+async function refreshProfile() {
+    try {
+        const res = await apiFetch('/users/me');
+        if (!res.ok) return;
+        const me = await res.json();
+        state.user.id = me.id ?? state.user.id;
+        state.user.name = me.name ?? state.user.name;
+        state.user.email = me.email ?? state.user.email;
+        state.user.phoneNumber = me.phoneNumber ?? state.user.phoneNumber;
+        saveAuth(state.token, state.user);
+        renderProfile();
+    } catch (e) {
+        // 조회 실패 시 기존 렌더를 유지한다(이미 renderProfile 로 표시됨).
     }
 }
 
@@ -1070,10 +1092,18 @@ async function apiFetch(url, options = {}) {
         baseUrl = '';
     }
 
-    return fetch(`${baseUrl}${url}`, {
+    const res = await fetch(`${baseUrl}${url}`, {
         ...options,
         headers
     });
+
+    // 토큰 만료/무효 시 Istio·서비스가 401/403 을 준다. 오래 켜둔 세션에서 프로필 수정 등이
+    // 조용히 실패(403)하던 문제를 막기 위해, 세션 만료를 알리고 재로그인 화면으로 보낸다.
+    if ((res.status === 401 || res.status === 403) && state.token) {
+        showToast('세션이 만료되었습니다. 다시 로그인해주세요.');
+        logout();
+    }
+    return res;
 }
 
 // ===============================
