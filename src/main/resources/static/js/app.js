@@ -955,6 +955,10 @@ function renderBookings() {
                             <div class="booking-actions">
                                 <button class="btn btn-sm btn-danger" onclick="cancelBooking(${reservation.id})">예약 취소 (환불)</button>
                             </div>
+                        ` : (reservation.status === 'CANCELED' || reservation.status === 'REFUNDED') ? `
+                            <div class="booking-actions">
+                                <button class="btn btn-sm btn-outline" onclick="deleteBooking(${reservation.id})">삭제</button>
+                            </div>
                         ` : ''}
                         `
                 }
@@ -1092,18 +1096,10 @@ async function apiFetch(url, options = {}) {
         baseUrl = '';
     }
 
-    const res = await fetch(`${baseUrl}${url}`, {
+    return fetch(`${baseUrl}${url}`, {
         ...options,
         headers
     });
-
-    // 토큰 만료/무효 시 Istio·서비스가 401/403 을 준다. 오래 켜둔 세션에서 프로필 수정 등이
-    // 조용히 실패(403)하던 문제를 막기 위해, 세션 만료를 알리고 재로그인 화면으로 보낸다.
-    if ((res.status === 401 || res.status === 403) && state.token) {
-        showToast('세션이 만료되었습니다. 다시 로그인해주세요.');
-        logout();
-    }
-    return res;
 }
 
 // ===============================
@@ -1137,6 +1133,31 @@ window.cancelBooking = async function(reservationId) {
         }
 
         showToast('예약이 취소되었으며 예약금이 자동 환불되었습니다.');
+        loadMyBookings();
+    } catch (error) {
+        showToast(error.message);
+    } finally {
+        hideLoader();
+    }
+};
+
+// ===============================
+// 🗑️ 취소/환불된 예약을 목록에서 삭제
+// ===============================
+window.deleteBooking = async function(reservationId) {
+    if (!confirm('이 예약 내역을 목록에서 삭제하시겠습니까?')) return;
+
+    showLoader();
+    try {
+        const res = await apiFetch(`/reservations/${reservationId}`, {
+            method: 'DELETE'
+        });
+
+        if (!res.ok) {
+            throw new Error('예약 삭제에 실패했습니다. (취소·환불된 예약만 삭제할 수 있습니다)');
+        }
+
+        showToast('예약 내역이 삭제되었습니다.');
         loadMyBookings();
     } catch (error) {
         showToast(error.message);
